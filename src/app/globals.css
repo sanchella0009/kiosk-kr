@@ -42,6 +42,14 @@ body.admin-scroll {
   scrollbar-width: auto;
 }
 
+html.kiosk-lock,
+body.kiosk-lock,
+body.kiosk-lock * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -298,7 +306,7 @@ select {
 
 .music-results {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
   min-width: 0;
 }
@@ -973,9 +981,6 @@ select {
 
 @media (max-width: 1024px) {
   .page {
-    grid-template-columns: 1fr;
-  }
-  .music-results {
     grid-template-columns: 1fr;
   }
   .music-results-artists {

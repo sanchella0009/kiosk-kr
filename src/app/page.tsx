@@ -2,9 +2,10 @@ import { prisma } from "@/lib/db";
 import { getTodayRange } from "@/lib/date";
 import { runMediaCleanup } from "@/lib/cleanup";
 import { KioskClient } from "@/components/KioskClient";
+import { KioskInteractionMode } from "@/components/KioskInteractionMode";
 
 export default async function KioskPage() {
-  const { start, end } = getTodayRange();
+  const { start } = getTodayRange();
   const end14 = new Date(start);
   end14.setDate(end14.getDate() + 13);
   end14.setHours(23, 59, 59, 999);
@@ -45,23 +46,26 @@ export default async function KioskPage() {
   ]);
 
   return (
-    <KioskClient
-      initialData={{
-        media,
-        scheduleImages: scheduleImages.map((item) => ({
-          id: item.id,
-          url: item.url,
-          dateFor: item.dateFor?.toISOString() ?? "",
-        })),
-        menuImages: menuImages.map((item) => ({
-          id: item.id,
-          url: item.url,
-          dateFor: item.dateFor?.toISOString() ?? "",
-        })),
-        sections,
-        reviews,
-        serverTime: new Date().toISOString(),
-      }}
-    />
+    <>
+      <KioskInteractionMode />
+      <KioskClient
+        initialData={{
+          media,
+          scheduleImages: scheduleImages.map((item) => ({
+            id: item.id,
+            url: item.url,
+            dateFor: item.dateFor?.toISOString() ?? "",
+          })),
+          menuImages: menuImages.map((item) => ({
+            id: item.id,
+            url: item.url,
+            dateFor: item.dateFor?.toISOString() ?? "",
+          })),
+          sections,
+          reviews,
+          serverTime: new Date().toISOString(),
+        }}
+      />
+    </>
   );
 }
