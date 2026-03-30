@@ -1,0 +1,790 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { ReviewForm } from "@/components/ReviewForm";
+import { MediaPanel } from "@/components/MediaPanel";
+import { formatDate } from "@/lib/date";
+import { SongSuggestPanel } from "@/components/SongSuggestPanel";
+
+type Section = {
+  id: string;
+  title: string;
+  content: string | null;
+};
+
+type Review = {
+  id: string;
+  name: string | null;
+  rating: number;
+  message: string;
+  createdAt: string | Date;
+};
+
+type WeatherDay = {
+  date: string;
+  tempMin: number | null;
+  tempMax: number | null;
+  icon?: string | null;
+  condition?: string | null;
+  code?: number | null;
+};
+
+type WeatherPayload = {
+  location: string;
+  now: {
+    temp: number;
+    feelsLike: number | null;
+    icon?: string | null;
+    condition?: string | null;
+    code?: number | null;
+  } | null;
+  days: WeatherDay[];
+  updatedAt: string;
+};
+
+type KioskData = {
+  media: { id: string; type: "PHOTO" | "VIDEO"; url: string; title?: string | null }[];
+  scheduleImages: { id: string; url: string; dateFor: string }[];
+  menuImages: { id: string; url: string; dateFor: string }[];
+  sections: Section[];
+  reviews: Review[];
+  serverTime: string;
+};
+
+type Props = {
+  initialData: KioskData;
+};
+
+type Panel = "home" | "schedule" | "menu" | "review" | "section" | "music";
+
+const INACTIVITY_MS = 60_000;
+const WEATHER_MIN = 5 * 60 * 1000;
+const WEATHER_MAX = 8 * 60 * 1000;
+const MEDIA_CACHE = "kiosk-cache-v4";
+
+export function KioskClient({ initialData }: Props) {
+  const [data, setData] = useState<KioskData>(initialData);
+  const [panel, setPanel] = useState<Panel>("home");
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const [scheduleKey, setScheduleKey] = useState<string | null>(null);
+  const [menuKey, setMenuKey] = useState<string | null>(null);
+  const [showEarlierSchedule, setShowEarlierSchedule] = useState(false);
+  const [showEarlierMenu, setShowEarlierMenu] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [showOnlineNotice, setShowOnlineNotice] = useState(false);
+  const [weather, setWeather] = useState<WeatherPayload | null>(null);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [now, setNow] = useState(new Date(initialData.serverTime));
+  const [musicModal, setMusicModal] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+  }>({ open: false, title: "", message: "" });
+  const [musicCountdown, setMusicCountdown] = useState(0);
+  const lastActivityRef = useRef(Date.now());
+  const wsRef = useRef<WebSocket | null>(null);
+  const timeRowRef = useRef<HTMLDivElement | null>(null);
+
+  const setOnlineState = (next: boolean) => {
+    setIsOnline((prev) => {
+      if (!prev && next) {
+        setShowOnlineNotice(true);
+        window.setTimeout(() => setShowOnlineNotice(false), 3000);
+      }
+      return next;
+    });
+  };
+
+  const refreshData = async () => {
+    try {
+      const res = await fetch(`/api/kiosk-data?ts=${Date.now()}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("offline");
+      const payload = (await res.json()) as KioskData;
+      setData(payload);
+      setNow(new Date(payload.serverTime));
+      setOnlineState(true);
+    } catch {
+      setOnlineState(false);
+    }
+  };
+
+  const onSelect = (next: Panel) => {
+    lastActivityRef.current = Date.now();
+    if (next !== "review") {
+      setShowReviewForm(false);
+    }
+    if (next !== "schedule") {
+      setShowEarlierSchedule(false);
+    }
+    if (next !== "menu") {
+      setShowEarlierMenu(false);
+    }
+    if (isOnline) {
+      refreshData();
+    }
+    setPanel(next);
+  };
+
+  const openMusicModal = (title: string, message: string) => {
+    setMusicModal({ open: true, title, message });
+    setMusicCountdown(15);
+  };
+
+  const closeMusicModal = () => {
+    setMusicModal({ open: false, title: "", message: "" });
+    setMusicCountdown(0);
+  };
+
+  const onMusicClick = async () => {
+    lastActivityRef.current = Date.now();
+    if (!isOnline) {
+      openMusicModal("⚠️ данная функция не доступна", "Нет связи с сервером.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/music/status", { cache: "no-store" });
+      if (!res.ok) throw new Error("status failed");
+      const data = (await res.json()) as { enabled: boolean; message?: string };
+      if (!data.enabled) {
+        openMusicModal(
+          "⚠️ данная функция не доступна",
+          data.message || "Предложения временно отключены."
+        );
+        return;
+      }
+      onSelect("music");
+    } catch {
+      openMusicModal(
+        "⚠️ данная функция не доступна",
+        "Сервис недоступен. Попробуйте позже."
+      );
+    }
+  };
+
+  const openSection = (id: string) => {
+    lastActivityRef.current = Date.now();
+    setSelectedSectionId(id);
+    setPanel("section");
+  };
+
+  useEffect(() => {
+    const touchOrPointer = () => {
+      lastActivityRef.current = Date.now();
+    };
+    const onKey = () => {
+      lastActivityRef.current = Date.now();
+    };
+    window.addEventListener("pointerdown", touchOrPointer);
+    window.addEventListener("touchstart", touchOrPointer);
+    window.addEventListener("keydown", onKey);
+    const id = window.setInterval(() => {
+      if (Date.now() - lastActivityRef.current > INACTIVITY_MS) {
+        setPanel("home");
+      }
+    }, 1000);
+    return () => {
+      window.removeEventListener("pointerdown", touchOrPointer);
+      window.removeEventListener("touchstart", touchOrPointer);
+      window.removeEventListener("keydown", onKey);
+      window.clearInterval(id);
+    };
+  }, []);
+
+  useEffect(() => {
+    const tick = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(tick);
+  }, []);
+
+  useEffect(() => {
+    if (!musicModal.open) return;
+    const id = window.setInterval(() => {
+      setMusicCountdown((prev) => {
+        if (prev <= 1) {
+          closeMusicModal();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [musicModal.open]);
+
+  const fitTimeText = () => {
+    const row = timeRowRef.current;
+    if (!row) return;
+    const timeSpan = row.querySelector<HTMLElement>(".time-corner-time");
+    if (!timeSpan) return;
+    row.style.removeProperty("--time-font-override");
+    if (row.scrollWidth <= row.clientWidth) return;
+    const currentSize = Number.parseFloat(getComputedStyle(timeSpan).fontSize) || 20;
+    const ratio = row.clientWidth / row.scrollWidth;
+    const newSize = Math.max(14, Math.floor(currentSize * ratio));
+    row.style.setProperty("--time-font-override", `${newSize}px`);
+  };
+
+  useEffect(() => {
+    fitTimeText();
+  }, [now, panel]);
+
+  useEffect(() => {
+    const onResize = () => fitTimeText();
+    window.addEventListener("resize", onResize);
+    const observer = new ResizeObserver(() => fitTimeText());
+    if (timeRowRef.current) observer.observe(timeRowRef.current);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    let timer: number | null = null;
+    const cacheKey = "kiosk_weather_cache_v1";
+    const countKey = "kiosk_weather_count_v1";
+
+    const getCountState = () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const raw = localStorage.getItem(countKey);
+      if (!raw) return { date: today, count: 0 };
+      try {
+        const parsed = JSON.parse(raw) as { date: string; count: number };
+        if (parsed.date !== today) return { date: today, count: 0 };
+        return parsed;
+      } catch {
+        return { date: today, count: 0 };
+      }
+    };
+
+    const setCountState = (count: number) => {
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem(countKey, JSON.stringify({ date: today, count }));
+    };
+
+    const computeNextInterval = (count: number) => {
+      const now = new Date();
+      const hour = now.getHours();
+      if (hour >= 23 || hour < 6) {
+        return 60 * 60 * 1000;
+      }
+
+      const DAILY_LIMIT = 450;
+      const remaining = Math.max(DAILY_LIMIT - count, 1);
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 0, 0, 0);
+      const minutesLeft = Math.max(
+        1,
+        Math.floor((endOfDay.getTime() - now.getTime()) / 60000)
+      );
+      const intervalMs = Math.max(
+        2 * 60 * 1000,
+        Math.floor((minutesLeft / remaining) * 60 * 1000)
+      );
+      return intervalMs;
+    };
+
+    const fetchWeather = async () => {
+      const state = getCountState();
+      try {
+        const res = await fetch(`/api/weather?ts=${Date.now()}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error("bad response");
+        const payload = (await res.json()) as WeatherPayload;
+        setWeather(payload);
+        setWeatherError(null);
+        localStorage.setItem(cacheKey, JSON.stringify(payload));
+        setCountState(state.count + 1);
+      } catch {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          setWeather(JSON.parse(cached) as WeatherPayload);
+        } else {
+          setWeatherError("Погода временно недоступна");
+        }
+      } finally {
+        const next = computeNextInterval(getCountState().count);
+        timer = window.setTimeout(fetchWeather, next);
+      }
+    };
+
+    fetchWeather();
+    return () => {
+      if (timer) window.clearTimeout(timer);
+    };
+  }, []);
+
+  const todayKey = now.toISOString().slice(0, 10);
+  const scheduleKeys = data.scheduleImages
+    .map((item) => item.dateFor.slice(0, 10))
+    .sort();
+  const menuKeys = data.menuImages
+    .map((item) => item.dateFor.slice(0, 10))
+    .sort();
+  const scheduleEarlierKeys = scheduleKeys.filter((key) => key < todayKey);
+  const scheduleUpcomingKeys = scheduleKeys.filter((key) => key >= todayKey);
+  const menuEarlierKeys = menuKeys.filter((key) => key < todayKey);
+  const menuUpcomingKeys = menuKeys.filter((key) => key >= todayKey);
+
+  useEffect(() => {
+    if (data.scheduleImages.length === 0) {
+      setScheduleKey(null);
+      return;
+    }
+    const list = showEarlierSchedule ? scheduleEarlierKeys : scheduleUpcomingKeys;
+    if (scheduleKey && list.includes(scheduleKey)) return;
+    if (showEarlierSchedule) {
+      setScheduleKey(
+        scheduleEarlierKeys[scheduleEarlierKeys.length - 1] ?? null
+      );
+    } else {
+      setScheduleKey(scheduleUpcomingKeys[0] ?? null);
+    }
+  }, [
+    data.scheduleImages,
+    scheduleKey,
+    now,
+    showEarlierSchedule,
+    scheduleEarlierKeys,
+    scheduleUpcomingKeys,
+  ]);
+
+  useEffect(() => {
+    if (data.menuImages.length === 0) {
+      setMenuKey(null);
+      return;
+    }
+    const list = showEarlierMenu ? menuEarlierKeys : menuUpcomingKeys;
+    if (menuKey && list.includes(menuKey)) return;
+    if (showEarlierMenu) {
+      setMenuKey(menuEarlierKeys[menuEarlierKeys.length - 1] ?? null);
+    } else {
+      setMenuKey(menuUpcomingKeys[0] ?? null);
+    }
+  }, [
+    data.menuImages,
+    menuKey,
+    now,
+    showEarlierMenu,
+    menuEarlierKeys,
+    menuUpcomingKeys,
+  ]);
+
+  useEffect(() => {
+    if (!("caches" in window) || !isOnline) return;
+    const urls = new Set<string>();
+    const photos = data.media.filter((item) => item.type === "PHOTO");
+    const videos = data.media.filter((item) => item.type === "VIDEO");
+    photos.forEach((item) => urls.add(item.url));
+    videos.forEach((item) => urls.add(item.url));
+    data.scheduleImages.forEach((item) => urls.add(item.url));
+    data.menuImages.forEach((item) => urls.add(item.url));
+    const list = Array.from(urls).filter((url) => url.startsWith("/"));
+    if (list.length === 0) return;
+    caches
+      .open(MEDIA_CACHE)
+      .then((cache) =>
+        list.reduce(
+          (chain, url) =>
+            chain.then(() =>
+              cache.match(url).then((hit) => {
+                if (!hit) return cache.add(url);
+              })
+            ),
+          Promise.resolve()
+        )
+      )
+      .catch(() => null);
+  }, [data.media, data.scheduleImages, data.menuImages, isOnline]);
+
+  useEffect(() => {
+    const url =
+      process.env.NEXT_PUBLIC_WS_URL ||
+      `${window.location.protocol === "https:" ? "wss" : "ws"}://${
+        window.location.host
+      }/ws/`;
+    const connect = () => {
+      try {
+        const ws = new WebSocket(url);
+        wsRef.current = ws;
+        ws.onopen = () => setOnlineState(true);
+        ws.onmessage = (event) => {
+          if (event.data === "refresh") {
+            refreshData();
+          }
+        };
+        ws.onclose = () => {
+          setTimeout(connect, 3000);
+        };
+      } catch {
+        setTimeout(connect, 5000);
+      }
+    };
+    connect();
+    return () => {
+      wsRef.current?.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const ping = async () => {
+      try {
+        const res = await fetch(`/api/health?ts=${Date.now()}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error("offline");
+        if (active) setOnlineState(true);
+      } catch {
+        if (active) setOnlineState(false);
+      }
+    };
+    ping();
+    const id = window.setInterval(ping, 10000);
+    const onOnline = () => setOnlineState(true);
+    const onOffline = () => setOnlineState(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
+  const locationName = weather?.location ?? "Красная Горка";
+  const todayLabel = formatDate(now);
+  const formatShortDate = (iso: string) =>
+    new Intl.DateTimeFormat("ru-RU", {
+      day: "2-digit",
+      month: "short",
+    }).format(new Date(iso));
+
+  return (
+    <main className="page">
+      <MediaPanel items={data.media} />
+      <section className="kiosk-right">
+        <div className="kiosk-scroll" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+          {panel === "home" ? (
+            <>
+              <div className="hero card">
+                <h1>Добро пожаловать в Красную Горку!</h1>
+              </div>
+              <div className="weather-widget card" style={{ marginTop: 0 }}>
+                <div className="weather-header">
+                  <div>
+                    <strong>Погода</strong>
+                    <div className="weather-sub">{locationName}</div>
+                  </div>
+                  {weather?.now?.icon ? (
+                    <div className="weather-icon" aria-hidden>
+                      {weather.now.icon}
+                    </div>
+                  ) : null}
+                </div>
+                {weather?.now ? (
+                  <div className="weather-now">
+                    <div className="weather-temp">{weather.now.temp}°</div>
+                    <div className="weather-meta">
+                      Ощущается {weather.now.feelsLike ?? weather.now.temp}°
+                    </div>
+                  </div>
+                ) : (
+                  <div className="weather-meta">
+                    {weatherError ?? "Загрузка погоды..."}
+                  </div>
+                )}
+                {weather?.now?.condition ? (
+                  <div className="weather-meta">{weather.now.condition}</div>
+                ) : null}
+                {weather?.updatedAt ? (
+                  <div className="weather-sub">
+                    Обновлено {new Date(weather.updatedAt).toLocaleTimeString("ru-RU")}
+                  </div>
+                ) : null}
+                <div className="weather-days">
+                  {weather?.days?.slice(0, 3).map((day) => (
+                    <div key={day.date} className="weather-day">
+                      <div>
+                        {day.icon ? <span>{day.icon} </span> : null}
+                        {day.date}
+                      </div>
+                      <div>
+                        {day.tempMax ?? "—"}° / {day.tempMin ?? "—"}°
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : null}
+
+          {panel === "home" ? (
+            <div className="nav-grid">
+            <button className="nav-btn" onClick={() => onSelect("schedule")}>
+              📅 Расписание
+            </button>
+            <button className="nav-btn" onClick={() => onSelect("menu")}>
+              🍲 Меню
+            </button>
+            <button className="nav-btn" onClick={() => onSelect("review")}>
+              ⭐ Отзывы
+            </button>
+            <button className="nav-btn" onClick={onMusicClick}>
+              🎵 Предложить песню
+            </button>
+            {data.sections.map((section) => (
+              <button
+                key={section.id}
+                  className="nav-btn"
+                  onClick={() => openSection(section.id)}
+                >
+                  ℹ️ {section.title}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <button className="btn-ghost btn-back" onClick={() => onSelect("home")}>
+              ← Назад
+            </button>
+          )}
+
+          {panel !== "home" ? (
+            <div className="section-block card panel">
+            {panel === "schedule" && (
+              <>
+                <h2>Расписание</h2>
+                {data.scheduleImages.length === 0 ? (
+                  <div>Расписание пока не загружено.</div>
+                ) : (
+                  <>
+                    <div className="date-tabs">
+                      {scheduleEarlierKeys.length > 0 ? (
+                        <button
+                          type="button"
+                          className={`date-tab ${
+                            showEarlierSchedule ? "active" : ""
+                          }`}
+                          onClick={() =>
+                            setShowEarlierSchedule((prev) => !prev)
+                          }
+                        >
+                          {showEarlierSchedule ? "Сегодня" : "Ранее"}
+                        </button>
+                      ) : null}
+                      {(showEarlierSchedule
+                        ? scheduleEarlierKeys
+                        : scheduleUpcomingKeys
+                      ).map((key) => {
+                        const item = data.scheduleImages.find(
+                          (entry) => entry.dateFor.slice(0, 10) === key
+                        );
+                        if (!item) return null;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className={`date-tab ${
+                              scheduleKey === key ? "active" : ""
+                            }`}
+                            onClick={() => setScheduleKey(key)}
+                          >
+                            {formatShortDate(item.dateFor)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {scheduleKey ? (
+                      <img
+                        src={
+                          data.scheduleImages.find(
+                            (item) => item.dateFor.slice(0, 10) === scheduleKey
+                          )?.url ?? ""
+                        }
+                        alt="Расписание"
+                        style={{
+                          width: "100%",
+                          borderRadius: 12,
+                          border: "2px solid #f3d6a0",
+                        }}
+                      />
+                    ) : null}
+                  </>
+                )}
+              </>
+            )}
+
+            {panel === "menu" && (
+              <>
+                <h2>Меню</h2>
+                {data.menuImages.length === 0 ? (
+                  <div>Меню пока не загружено.</div>
+                ) : (
+                  <>
+                    <div className="date-tabs">
+                      {menuEarlierKeys.length > 0 ? (
+                        <button
+                          type="button"
+                          className={`date-tab ${showEarlierMenu ? "active" : ""}`}
+                          onClick={() => setShowEarlierMenu((prev) => !prev)}
+                        >
+                          {showEarlierMenu ? "Сегодня" : "Ранее"}
+                        </button>
+                      ) : null}
+                      {(showEarlierMenu ? menuEarlierKeys : menuUpcomingKeys).map(
+                        (key) => {
+                          const item = data.menuImages.find(
+                            (entry) => entry.dateFor.slice(0, 10) === key
+                          );
+                          if (!item) return null;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className={`date-tab ${
+                                menuKey === key ? "active" : ""
+                              }`}
+                              onClick={() => setMenuKey(key)}
+                            >
+                              {formatShortDate(item.dateFor)}
+                            </button>
+                          );
+                        }
+                      )}
+                    </div>
+                    {menuKey ? (
+                      <img
+                        src={
+                          data.menuImages.find(
+                            (item) => item.dateFor.slice(0, 10) === menuKey
+                          )?.url ?? ""
+                        }
+                        alt="Меню"
+                        style={{
+                          width: "100%",
+                          borderRadius: 12,
+                          border: "2px solid #f3d6a0",
+                        }}
+                      />
+                    ) : null}
+                  </>
+                )}
+              </>
+            )}
+
+            {panel === "section" && (
+              <>
+                {selectedSectionId ? (
+                  (() => {
+                    const section = data.sections.find(
+                      (item) => item.id === selectedSectionId
+                    );
+                    if (!section) {
+                      return <div>Раздел не найден.</div>;
+                    }
+                    return (
+                      <>
+                        <h2>{section.title}</h2>
+                        <div
+                          className="editor-view"
+                          dangerouslySetInnerHTML={{
+                            __html: section.content ?? "",
+                          }}
+                        />
+                      </>
+                    );
+                  })()
+                ) : (
+                  <div>Выберите раздел.</div>
+                )}
+              </>
+            )}
+
+            {panel === "review" && (
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    marginBottom: 12,
+                  }}
+                >
+                  <h2>Отзывы о лагере</h2>
+                  <button
+                    className="btn-primary"
+                    type="button"
+                    onClick={() => setShowReviewForm((prev) => !prev)}
+                  >
+                    {showReviewForm ? "Скрыть форму" : "Оставить отзыв"}
+                  </button>
+                </div>
+                {showReviewForm ? (
+                  <ReviewForm campName="лагере" />
+                ) : (
+                  <div className="list">
+                    {data.reviews.length === 0 && <div>Пока нет отзывов.</div>}
+                    {data.reviews.map((review) => (
+                      <div key={review.id} className="card" style={{ padding: 14 }}>
+                        <div>
+                          {"★".repeat(review.rating)}{" "}
+                          <strong>{review.name || "Гость"}</strong>
+                        </div>
+                        <div style={{ marginTop: 6 }}>{review.message}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {panel === "music" && (
+              <>
+                <h2>Предложить песню диджею</h2>
+                <SongSuggestPanel />
+              </>
+            )}
+          </div>
+        ) : null}
+        </div>
+
+        <div className="kiosk-dock">
+          {!isOnline ? (
+            <div className="offline-bar">Нет связи с сервером</div>
+          ) : showOnlineNotice ? (
+            <div className="offline-bar online">Подключение восстановлено</div>
+          ) : null}
+          {panel === "home" ? (
+            <div className="time-dock">
+              <div className="time-corner">
+                <div className="time-corner-row" ref={timeRowRef}>
+                  <span className="time-corner-time" suppressHydrationWarning>
+                    {now.toLocaleTimeString("ru-RU")}
+                  </span>
+                  <span className="time-corner-date" suppressHydrationWarning>
+                    {now.toLocaleDateString("ru-RU")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </section>
+      {musicModal.open ? (
+        <div className="kiosk-modal">
+          <div className="kiosk-modal-card">
+            <div className="kiosk-modal-title">{musicModal.title}</div>
+            <div className="kiosk-modal-text">{musicModal.message}</div>
+            <button className="btn-primary" type="button" onClick={closeMusicModal}>
+              Понятно ({musicCountdown})
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </main>
+  );
+}

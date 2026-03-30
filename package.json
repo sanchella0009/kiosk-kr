@@ -1,0 +1,37 @@
+{
+  "name": "app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "NEXT_TURBOPACK=0 next dev -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0",
+    "lint": "eslint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "db:push": "prisma db push",
+    "bot": "tsx bot/index.ts",
+    "seed:main-admin": "tsx scripts/seed-main-admin.ts",
+    "ws:server": "tsx ws/server.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.11.0",
+    "bcryptjs": "^3.0.3",
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "telegraf": "^4.16.3",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "prisma": "^6.11.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

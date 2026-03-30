@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  MAIN_ADMIN
+  ADMIN
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MediaType {
+  PHOTO
+  VIDEO
+}
+
+enum MediaCategory {
+  MAIN
+  SCHEDULE
+  MENU
+}
+
+model User {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  passwordHash String
+  role         UserRole  @default(ADMIN)
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+  telegramAdmins TelegramAdmin[]
+  telegramLinks  TelegramLink[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Media {
+  id        String    @id @default(cuid())
+  type      MediaType
+  category  MediaCategory @default(MAIN)
+  title     String?
+  url       String
+  dateFor   DateTime?
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+}
+
+model ScheduleItem {
+  id        String   @id @default(cuid())
+  title     String
+  startTime String
+  endTime   String
+  date      DateTime
+  createdAt DateTime @default(now())
+}
+
+model MenuItem {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  mealType    String
+  date        DateTime
+  createdAt   DateTime @default(now())
+}
+
+model Review {
+  id        String       @id @default(cuid())
+  name      String?
+  rating    Int
+  message   String
+  status    ReviewStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+}
+
+model Section {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  content   String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Shift {
+  id        String   @id @default(cuid())
+  title     String?
+  startDate DateTime
+  endDate   DateTime
+  createdAt DateTime @default(now())
+}
+
+model TelegramAdmin {
+  id         String   @id @default(cuid())
+  telegramId String   @unique
+  username   String?
+  name       String?
+  isDj       Boolean  @default(false)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+}
+
+model TelegramLink {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  usedAt     DateTime?
+  telegramId String?
+  createdAt  DateTime @default(now())
+}
+
+model MusicSetting {
+  key             String   @id
+  isEnabled       Boolean  @default(true)
+  disabledMessage String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum SongSuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model SongSuggestion {
+  id        String               @id @default(cuid())
+  query     String
+  trackId   String
+  artist    String
+  title     String
+  year      Int?
+  yandexUrl String
+  coverUrl  String?
+  status    SongSuggestionStatus @default(PENDING)
+  createdAt DateTime             @default(now())
+}
