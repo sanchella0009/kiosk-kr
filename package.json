@@ -13,6 +13,7 @@
     "db:push": "prisma db push",
     "bot": "tsx bot/index.ts",
     "seed:main-admin": "tsx scripts/seed-main-admin.ts",
+    "reset:main-admin": "tsx scripts/reset-main-admin.ts",
     "ws:server": "tsx ws/server.ts"
   },
   "dependencies": {
