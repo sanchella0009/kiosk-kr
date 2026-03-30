@@ -31,6 +31,7 @@ export function SongSuggestPanel() {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [searchTracks, setSearchTracks] = useState<Track[]>([]);
   const [results, setResults] = useState<Track[]>([]);
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [status, setStatus] = useState<
     | "idle"
@@ -53,6 +54,7 @@ export function SongSuggestPanel() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const trimmedQuery = query.trim();
   const isBusy = status === "searching" || status === "submitting";
+  const canSuggest = hasAcceptedTerms && !isBusy;
 
   const clearBlurTimeout = () => {
     if (blurTimeoutRef.current === null) return;
@@ -159,7 +161,7 @@ export function SongSuggestPanel() {
   };
 
   const suggest = async (track: Track) => {
-    if (isBusy) return;
+    if (!canSuggest) return;
     clearBlurTimeout();
     setFocused(false);
     setPendingTrackLabel(`${track.artist} — ${track.title}`);
@@ -170,6 +172,7 @@ export function SongSuggestPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: trimmedQuery,
+          acceptedTerms: hasAcceptedTerms,
           isExplicit: hasExplicitMark(track),
           ...track,
         }),
@@ -188,7 +191,9 @@ export function SongSuggestPanel() {
       setSearchTracks([]);
       setSelectedArtist(null);
       setQuery("");
+      setHasAcceptedTerms(false);
       setHasSearchedCurrentQuery(false);
+      setPendingTrackLabel("");
     } catch {
       setStatus("submit-error");
     }
@@ -255,6 +260,28 @@ export function SongSuggestPanel() {
         </button>
       </div>
 
+      {enabled ? (
+        <div className="music-agreement" role="note" aria-label="Условия заказа песни">
+          <div className="music-agreement-title">Условия заказа песни</div>
+          <div className="music-agreement-text">
+            Если вы отправляете песню, это не значит, что она точно прозвучит на
+            ближайшей дискотеке. Диджей сам решает, какую музыку ставить. Иногда
+            песню могут не включить, и диджей не обязан объяснять почему.
+          </div>
+          <label className="music-agreement-check">
+            <input
+              type="checkbox"
+              checked={hasAcceptedTerms}
+              onChange={(event) => setHasAcceptedTerms(event.target.checked)}
+            />
+            <span>Я согласен с условиями</span>
+          </label>
+          <div className="music-agreement-hint">
+            Пока галочка не стоит, заказать песню нельзя.
+          </div>
+        </div>
+      ) : null}
+
       {status === "searching" && <div>Поиск...</div>}
       {status === "no-results" && (
         <div>Ничего не найдено. Уточните запрос.</div>
@@ -270,6 +297,8 @@ export function SongSuggestPanel() {
       {status === "sent" && (
         <div className="music-feedback music-feedback-success">
           Спасибо! Заявка отправлена диджею.
+          <br />
+          Это не значит, что песню точно включат.
           <br />
           Если нажали несколько раз за {DUPLICATE_HINT_WINDOW_SECONDS} секунд, дубликаты
           будут отброшены автоматически.
@@ -334,10 +363,10 @@ export function SongSuggestPanel() {
               {results.map((track) => (
                 <button
                   key={track.trackId}
-                  className="music-card"
+                  className={hasAcceptedTerms ? "music-card" : "music-card music-card-locked"}
                   type="button"
                   onClick={() => suggest(track)}
-                  disabled={isBusy}
+                  disabled={!canSuggest}
                 >
                   {track.coverUrl ? (
                     <img className="music-cover" src={track.coverUrl} alt="" />

@@ -272,6 +272,49 @@ select {
   line-height: 1.4;
 }
 
+.music-agreement {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #fff7eb;
+  border: 2px solid #f3d6a0;
+}
+
+.music-agreement-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.music-agreement-text {
+  color: #5f4a34;
+  line-height: 1.5;
+}
+
+.music-agreement-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.music-agreement-check input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  flex: 0 0 auto;
+}
+
+.music-agreement-hint {
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
 .music-feedback {
   padding: 12px 14px;
   border-radius: 14px;
@@ -350,6 +393,15 @@ select {
   width: 100%;
   max-width: 100%;
   overflow: hidden;
+}
+
+.music-card:disabled {
+  cursor: not-allowed;
+}
+
+.music-card-locked {
+  opacity: 0.68;
+  box-shadow: none;
 }
 
 .music-card-artist {

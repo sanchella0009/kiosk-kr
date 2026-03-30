@@ -17,6 +17,8 @@ export async function POST(request: Request) {
     typeof body.yandexUrl === "string" ? body.yandexUrl.trim() : "";
   const coverUrl =
     typeof body.coverUrl === "string" ? body.coverUrl.trim() : null;
+  const acceptedTerms =
+    body.acceptedTerms === true || body.acceptedTerms === "true";
   const isExplicit =
     body.isExplicit === true ||
     body.isExplicit === "true" ||
@@ -26,6 +28,16 @@ export async function POST(request: Request) {
 
   if (!query || !trackId || !artist || !title || !yandexUrl) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
+  }
+
+  if (!acceptedTerms) {
+    return NextResponse.json(
+      {
+        error: "terms_required",
+        message: "Необходимо согласиться с условиями заказа песни.",
+      },
+      { status: 400 }
+    );
   }
 
   const settings = await getMusicSetting();
