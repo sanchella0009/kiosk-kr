@@ -34,6 +34,14 @@ body {
   overflow: hidden;
 }
 
+html.admin-scroll,
+body.admin-scroll {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  height: auto;
+  scrollbar-width: auto;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -588,18 +596,19 @@ select {
 }
 
 .admin-layout {
-  position: fixed;
-  inset: 0;
+  min-height: 100vh;
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
-  overflow: hidden;
 }
 
 .admin-nav {
   padding: 24px;
   background: #fff7e6;
   border-right: 1px solid #f3e2c4;
-  min-height: 0;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: 100vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -607,9 +616,6 @@ select {
 .admin-main {
   padding: 28px;
   min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .admin-card {
@@ -840,7 +846,11 @@ select {
   }
   .admin-layout {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .admin-nav {
+    position: static;
+    max-height: none;
+    overflow: visible;
   }
 }
 
