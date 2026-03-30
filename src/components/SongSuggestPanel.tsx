@@ -10,6 +10,8 @@ type Track = {
   year: number | null;
   yandexUrl: string;
   coverUrl?: string | null;
+  explicit?: boolean;
+  contentWarning?: string | null;
 };
 
 type Artist = {
@@ -21,6 +23,8 @@ type Artist = {
 const TRACK_RESULT_LIMIT = 12;
 const ARTIST_RESULT_LIMIT = 3;
 const DUPLICATE_HINT_WINDOW_SECONDS = 15;
+const hasExplicitMark = (track: Pick<Track, "explicit" | "contentWarning">) =>
+  Boolean(track.explicit || track.contentWarning === "explicit");
 
 export function SongSuggestPanel() {
   const [query, setQuery] = useState("");
@@ -166,6 +170,7 @@ export function SongSuggestPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: trimmedQuery,
+          isExplicit: hasExplicitMark(track),
           ...track,
         }),
       });
@@ -340,11 +345,16 @@ export function SongSuggestPanel() {
                     <div className="music-cover placeholder">🎵</div>
                   )}
                   <div className="music-meta">
-                    <div className="music-title">
-                      {track.artist} — {track.title}
-                    </div>
+                    <div className="music-artist">{track.artist}</div>
+                    <div className="music-title">{track.title}</div>
                     {track.year ? (
                       <div className="music-year">{track.year}</div>
+                    ) : null}
+                    {hasExplicitMark(track) ? (
+                      <div className="music-explicit-warning" role="note">
+                        <span className="music-explicit-icon" aria-hidden="true" />
+                        <span>Возможно, данная песня не пройдет цензуру.</span>
+                      </div>
                     ) : null}
                   </div>
                 </button>

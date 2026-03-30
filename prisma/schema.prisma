@@ -151,6 +151,7 @@ model SongSuggestion {
   year      Int?
   yandexUrl String
   coverUrl  String?
+  isExplicit Boolean             @default(false)
   status    SongSuggestionStatus @default(PENDING)
   createdAt DateTime             @default(now())
 }

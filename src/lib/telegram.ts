@@ -60,6 +60,7 @@ type SongSuggestionPayload = {
   title: string;
   year: number | null;
   yandexUrl: string;
+  isExplicit: boolean;
 };
 
 export const sendSongSuggestionToTelegram = async (
@@ -72,9 +73,13 @@ export const sendSongSuggestionToTelegram = async (
   });
   if (djs.length === 0) return;
   const year = suggestion.year ? ` (${suggestion.year})` : "";
+  const moderationNote = suggestion.isExplicit
+    ? `\n⚠️ Возможно, песня не пройдет цензуру: у трека есть метка E.\n`
+    : "\n";
   const text =
     `Новая заявка на песню:\n` +
     `${suggestion.artist} — ${suggestion.title}${year}\n` +
+    moderationNote +
     `Ссылка: ${suggestion.yandexUrl}\n` +
     `ID: ${suggestion.id}`;
 

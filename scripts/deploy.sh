@@ -26,6 +26,8 @@ git pull --ff-only
 case "$MODE" in
   web)
     sudo docker compose up -d kiosk-web nginx
+    sudo docker compose exec -T kiosk-web npx prisma generate
+    sudo docker compose exec -T kiosk-web npx prisma db push
     sudo docker compose exec -T kiosk-web npm run build
     sudo docker compose restart kiosk-web nginx
     ;;

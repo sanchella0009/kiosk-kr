@@ -2,9 +2,17 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getMusicSetting } from "@/lib/music-settings";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+type SongsFilter = "all" | "clean" | "explicit";
+
+const normalizeSongsFilter = (value?: string): SongsFilter => {
+  if (value === "clean" || value === "explicit") return value;
+  return "all";
+};
 
 const deleteSuggestion = async (formData: FormData) => {
   "use server";
@@ -35,10 +43,22 @@ const updateSettings = async (formData: FormData) => {
   revalidatePath("/adm/songs");
 };
 
-export default async function SongsAdminPage() {
+export default async function SongsAdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
   await requireAdmin();
+  const params = await searchParams;
+  const filter = normalizeSongsFilter(params.filter);
   const settings = await getMusicSetting();
   const items = await prisma.songSuggestion.findMany({
+    where:
+      filter === "all"
+        ? {}
+        : {
+            isExplicit: filter === "explicit",
+          },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
@@ -73,6 +93,29 @@ export default async function SongsAdminPage() {
           </button>
         </form>
       </div>
+      <div className="admin-card">
+        <h2>Фильтр</h2>
+        <div className="admin-filters">
+          <Link
+            href="/adm/songs"
+            className={`pill admin-filter-link${filter === "all" ? " active" : ""}`}
+          >
+            Все
+          </Link>
+          <Link
+            href="/adm/songs?filter=clean"
+            className={`pill admin-filter-link${filter === "clean" ? " active" : ""}`}
+          >
+            Без E
+          </Link>
+          <Link
+            href="/adm/songs?filter=explicit"
+            className={`pill admin-filter-link${filter === "explicit" ? " active" : ""}`}
+          >
+            С E
+          </Link>
+        </div>
+      </div>
       {items.length === 0 ? (
         <div>Пока нет заявок.</div>
       ) : (
@@ -82,27 +125,32 @@ export default async function SongsAdminPage() {
             className="admin-card"
             style={{ padding: 16 }}
           >
-            <div style={{ display: "flex", gap: 16 }}>
+            <div className="admin-suggestion-row">
               {item.coverUrl ? (
                 <img
                   src={item.coverUrl}
                   alt=""
-                  style={{
-                    width: 96,
-                    height: 96,
-                    borderRadius: 12,
-                    objectFit: "cover",
-                  }}
+                  className="admin-suggestion-cover"
                 />
               ) : null}
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 18 }}>
-                  {item.artist} — {item.title}
-                  {item.year ? ` (${item.year})` : ""}
+              <div className="admin-suggestion-meta">
+                <div className="admin-suggestion-title-row">
+                  <div className="admin-suggestion-title">
+                    {item.artist} — {item.title}
+                    {item.year ? ` (${item.year})` : ""}
+                  </div>
+                  {item.isExplicit ? (
+                    <div className="pill music-explicit-pill">E</div>
+                  ) : null}
                 </div>
                 <div style={{ color: "var(--ink-muted)", marginTop: 4 }}>
                   Запрос: {item.query}
                 </div>
+                {item.isExplicit ? (
+                  <div className="admin-explicit-note">
+                    Возможно, песня не пройдет цензуру.
+                  </div>
+                ) : null}
                 <a
                   href={item.yandexUrl}
                   target="_blank"
@@ -112,14 +160,17 @@ export default async function SongsAdminPage() {
                 >
                   Открыть в Яндекс Музыке
                 </a>
-                <form action={deleteSuggestion} style={{ display: "inline-block", marginTop: 8, marginLeft: 8 }}>
+                <form
+                  action={deleteSuggestion}
+                  style={{ display: "inline-block", marginTop: 8, marginLeft: 8 }}
+                >
                   <input type="hidden" name="id" value={item.id} />
                   <button className="btn-ghost" type="submit">
                     Удалить
                   </button>
                 </form>
               </div>
-              <div style={{ color: "var(--ink-muted)" }}>
+              <div className="admin-suggestion-date">
                 {item.createdAt.toLocaleString("ru-RU")}
               </div>
             </div>

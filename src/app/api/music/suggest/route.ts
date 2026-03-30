@@ -17,6 +17,12 @@ export async function POST(request: Request) {
     typeof body.yandexUrl === "string" ? body.yandexUrl.trim() : "";
   const coverUrl =
     typeof body.coverUrl === "string" ? body.coverUrl.trim() : null;
+  const isExplicit =
+    body.isExplicit === true ||
+    body.isExplicit === "true" ||
+    body.explicit === true ||
+    body.explicit === "true" ||
+    body.contentWarning === "explicit";
 
   if (!query || !trackId || !artist || !title || !yandexUrl) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
@@ -55,11 +61,12 @@ export async function POST(request: Request) {
       year,
       yandexUrl,
       coverUrl,
+      isExplicit,
     },
   });
 
   console.info(
-    `[music-suggest] saved id=${suggestion.id} track=${trackId} db_ms=${Date.now() - startedAt}`
+    `[music-suggest] saved id=${suggestion.id} track=${trackId} explicit=${isExplicit} db_ms=${Date.now() - startedAt}`
   );
 
   void (async () => {
@@ -70,6 +77,7 @@ export async function POST(request: Request) {
       title: suggestion.title,
       year: suggestion.year,
       yandexUrl: suggestion.yandexUrl,
+      isExplicit: suggestion.isExplicit,
     });
     console.info(
       `[music-suggest] telegram_sent id=${suggestion.id} telegram_ms=${Date.now() - telegramStartedAt}`

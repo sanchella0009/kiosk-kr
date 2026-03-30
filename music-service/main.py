@@ -48,6 +48,8 @@ def serialize_track(track):
     year = None
     if track.albums and track.albums[0].year:
         year = int(track.albums[0].year)
+    content_warning = getattr(track, "content_warning", None)
+    explicit = bool(getattr(track, "explicit", False) or content_warning == "explicit")
 
     return {
         "trackId": str(track.id),
@@ -56,6 +58,8 @@ def serialize_track(track):
         "year": year,
         "yandexUrl": f"https://music.yandex.ru/track/{track.id}",
         "coverUrl": cover_url(track.cover_uri, 300),
+        "explicit": explicit,
+        "contentWarning": content_warning,
     }
 
 
