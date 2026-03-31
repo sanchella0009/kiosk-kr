@@ -45,8 +45,12 @@ export const isSongSuggestionBlockReason = (
 
 export const normalizeSongSuggestionBlockReason = (
   value: string | null | undefined
-): SongSuggestionBlockReasonValue =>
-  isSongSuggestionBlockReason(value ?? "") ? value : "CUSTOM";
+): SongSuggestionBlockReasonValue => {
+  const normalizedValue = value ?? "";
+  return isSongSuggestionBlockReason(normalizedValue)
+    ? normalizedValue
+    : "CUSTOM";
+};
 
 export const formatSongSuggestionBlockReasonLabel = (
   reasonType: SongSuggestionBlockReasonValue,
