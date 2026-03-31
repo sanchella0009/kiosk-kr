@@ -38,6 +38,7 @@ export function SongSuggestPanel() {
     | "searching"
     | "search-error"
     | "submitting"
+    | "blocked"
     | "submit-error"
     | "no-results"
     | "sent"
@@ -49,6 +50,7 @@ export function SongSuggestPanel() {
   const [focused, setFocused] = useState(false);
   const [hasSearchedCurrentQuery, setHasSearchedCurrentQuery] = useState(false);
   const [pendingTrackLabel, setPendingTrackLabel] = useState("");
+  const [blockedMessage, setBlockedMessage] = useState("");
   const keyboardInteractRef = useRef(false);
   const blurTimeoutRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -60,6 +62,13 @@ export function SongSuggestPanel() {
     if (blurTimeoutRef.current === null) return;
     window.clearTimeout(blurTimeoutRef.current);
     blurTimeoutRef.current = null;
+  };
+
+  const clearBlockedFeedback = () => {
+    setBlockedMessage("");
+    if (status === "blocked") {
+      setStatus("idle");
+    }
   };
 
   const focusInput = () => {
@@ -90,6 +99,7 @@ export function SongSuggestPanel() {
   const search = async () => {
     const q = trimmedQuery;
     if (!q) return;
+    clearBlockedFeedback();
     setHasSearchedCurrentQuery(true);
     setStatus("searching");
     setSelectedArtist(null);
@@ -131,6 +141,7 @@ export function SongSuggestPanel() {
   };
 
   const loadArtistTracks = async (artist: Artist) => {
+    clearBlockedFeedback();
     setSelectedArtist(artist);
     setStatus("searching");
     try {
@@ -162,6 +173,7 @@ export function SongSuggestPanel() {
 
   const suggest = async (track: Track) => {
     if (!canSuggest) return;
+    clearBlockedFeedback();
     clearBlurTimeout();
     setFocused(false);
     setPendingTrackLabel(`${track.artist} — ${track.title}`);
@@ -181,7 +193,17 @@ export function SongSuggestPanel() {
         const data = (await res.json()) as { message?: string };
         if (data?.message) setDisabledMessage(data.message);
         setEnabled(false);
+        setPendingTrackLabel("");
         setStatus("idle");
+        return;
+      }
+      if (res.status === 409) {
+        const data = (await res.json()) as { message?: string };
+        setBlockedMessage(
+          data.message ?? "Эту песню сейчас нельзя предложить."
+        );
+        setPendingTrackLabel("");
+        setStatus("blocked");
         return;
       }
       if (!res.ok) throw new Error("suggest failed");
@@ -193,19 +215,23 @@ export function SongSuggestPanel() {
       setQuery("");
       setHasAcceptedTerms(false);
       setHasSearchedCurrentQuery(false);
+      setBlockedMessage("");
       setPendingTrackLabel("");
     } catch {
+      setPendingTrackLabel("");
       setStatus("submit-error");
     }
   };
 
   const insertText = (text: string) => {
+    clearBlockedFeedback();
     setQuery((prev) => prev + text);
     setHasSearchedCurrentQuery(false);
     focusInput();
   };
 
   const backspace = () => {
+    clearBlockedFeedback();
     setQuery((prev) => prev.slice(0, -1));
     setHasSearchedCurrentQuery(false);
     focusInput();
@@ -227,6 +253,7 @@ export function SongSuggestPanel() {
             placeholder="Введите исполнителя и название"
             value={query}
             onChange={(event) => {
+              clearBlockedFeedback();
               setQuery(event.target.value);
               setHasSearchedCurrentQuery(false);
             }}
@@ -288,6 +315,11 @@ export function SongSuggestPanel() {
       )}
       {status === "search-error" && (
         <div>Не удалось найти песню. Попробуйте позже.</div>
+      )}
+      {status === "blocked" && (
+        <div className="music-feedback music-feedback-pending">
+          {blockedMessage}
+        </div>
       )}
       {status === "submit-error" && (
         <div className="music-feedback music-feedback-error">

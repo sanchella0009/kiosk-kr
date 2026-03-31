@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendSongSuggestionToTelegram } from "@/lib/telegram";
 import { getMusicSetting } from "@/lib/music-settings";
+import { formatSongSuggestionBlockReasonMessage } from "@/lib/song-suggestion-blocks";
 
 const DUPLICATE_WINDOW_MS = 15_000;
 
@@ -45,6 +46,22 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "disabled", message: settings.disabledMessage },
       { status: 403 }
+    );
+  }
+
+  const blockedTrack = await prisma.songSuggestionBlock.findUnique({
+    where: { trackId },
+  });
+  if (blockedTrack) {
+    return NextResponse.json(
+      {
+        error: "blocked",
+        message: formatSongSuggestionBlockReasonMessage(
+          blockedTrack.reasonType,
+          blockedTrack.reasonText
+        ),
+      },
+      { status: 409 }
     );
   }
 

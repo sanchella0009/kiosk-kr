@@ -142,6 +142,13 @@ enum SongSuggestionStatus {
   REJECTED
 }
 
+enum SongSuggestionBlockReason {
+  FOREIGN_AGENT
+  EXPLICIT_LANGUAGE
+  DIRECTOR_BANNED
+  CUSTOM
+}
+
 model SongSuggestion {
   id        String               @id @default(cuid())
   query     String
@@ -154,4 +161,15 @@ model SongSuggestion {
   isExplicit Boolean             @default(false)
   status    SongSuggestionStatus @default(PENDING)
   createdAt DateTime             @default(now())
+}
+
+model SongSuggestionBlock {
+  id         String                    @id @default(cuid())
+  trackId    String                    @unique
+  artist     String?
+  title      String?
+  reasonType SongSuggestionBlockReason
+  reasonText String?
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
 }
