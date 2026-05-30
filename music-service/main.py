@@ -72,12 +72,12 @@ def serialize_artist(artist):
 
 
 @app.get("/health")
-def health():
+async def health():
     return {"ok": True}
 
 
 @app.post("/search")
-def search_tracks(payload: SearchRequest):
+async def search_tracks(payload: SearchRequest):
     query = payload.query.strip()
     if not query:
         raise HTTPException(status_code=400, detail="query is required")
@@ -105,7 +105,7 @@ def search_tracks(payload: SearchRequest):
 
 
 @app.post("/artist-tracks")
-def artist_tracks(payload: ArtistTracksRequest):
+async def artist_tracks(payload: ArtistTracksRequest):
     artist_id = payload.artist_id.strip()
     if not artist_id:
         raise HTTPException(status_code=400, detail="artist_id is required")

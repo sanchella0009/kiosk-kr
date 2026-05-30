@@ -99,11 +99,12 @@ model Section {
 }
 
 model Shift {
-  id        String   @id @default(cuid())
-  title     String?
-  startDate DateTime
-  endDate   DateTime
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  title      String?
+  startDate  DateTime
+  endDate    DateTime
+  counselors String?
+  createdAt  DateTime @default(now())
 }
 
 model TelegramAdmin {
@@ -173,3 +174,13 @@ model SongSuggestionBlock {
   createdAt  DateTime                  @default(now())
   updatedAt  DateTime                  @updatedAt
 }
+
+model KioskAnalytics {
+  id        String   @id @default(cuid())
+  type      String   // "VISIT", "CLICK"
+  target    String
+  kioskId   String
+  ip        String?
+  createdAt DateTime @default(now())
+}
+

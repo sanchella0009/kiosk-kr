@@ -48,6 +48,7 @@ type KioskData = {
   menuImages: { id: string; url: string; dateFor: string }[];
   sections: Section[];
   reviews: Review[];
+  activeShiftCounselors?: string | null;
   serverTime: string;
 };
 
@@ -55,7 +56,7 @@ type Props = {
   initialData: KioskData;
 };
 
-type Panel = "home" | "schedule" | "menu" | "review" | "section" | "music";
+type Panel = "home" | "schedule" | "menu" | "review" | "section" | "music" | "counselors";
 
 const INACTIVITY_MS = 60_000;
 const WEATHER_MIN = 5 * 60 * 1000;
@@ -85,6 +86,16 @@ export function KioskClient({ initialData }: Props) {
   const lastActivityRef = useRef(Date.now());
   const wsRef = useRef<WebSocket | null>(null);
   const timeRowRef = useRef<HTMLDivElement | null>(null);
+
+  const trackEvent = (type: "VISIT" | "CLICK", target: string) => {
+    const kioskId = localStorage.getItem("kiosk_id");
+    if (!kioskId) return;
+    fetch("/api/analytics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, target, kioskId }),
+    }).catch((err) => console.warn("Analytics error:", err));
+  };
 
   const setOnlineState = (next: boolean) => {
     setIsOnline((prev) => {
@@ -126,6 +137,9 @@ export function KioskClient({ initialData }: Props) {
       refreshData();
     }
     setPanel(next);
+    if (next !== "home") {
+      trackEvent("CLICK", next);
+    }
   };
 
   const openMusicModal = (title: string, message: string) => {
@@ -140,6 +154,7 @@ export function KioskClient({ initialData }: Props) {
 
   const onMusicClick = async () => {
     lastActivityRef.current = Date.now();
+    trackEvent("CLICK", "music");
     if (!isOnline) {
       openMusicModal("⚠️ данная функция не доступна", "Нет связи с сервером.");
       return;
@@ -168,13 +183,36 @@ export function KioskClient({ initialData }: Props) {
     lastActivityRef.current = Date.now();
     setSelectedSectionId(id);
     setPanel("section");
+    const section = data.sections.find((s) => s.id === id);
+    trackEvent("CLICK", `section:${section?.title || id}`);
   };
 
   useEffect(() => {
+    // Generate or fetch kiosk ID on mount
+    let kid = localStorage.getItem("kiosk_id");
+    if (!kid) {
+      kid = `Kiosk-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      localStorage.setItem("kiosk_id", kid);
+    }
+    // Track initial page load
+    fetch("/api/analytics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "VISIT", target: "load", kioskId: kid }),
+    }).catch((err) => console.warn(err));
+
     const touchOrPointer = () => {
+      const timeSinceLastActivity = Date.now() - lastActivityRef.current;
+      if (timeSinceLastActivity > INACTIVITY_MS) {
+        trackEvent("VISIT", "approach");
+      }
       lastActivityRef.current = Date.now();
     };
     const onKey = () => {
+      const timeSinceLastActivity = Date.now() - lastActivityRef.current;
+      if (timeSinceLastActivity > INACTIVITY_MS) {
+        trackEvent("VISIT", "approach");
+      }
       lastActivityRef.current = Date.now();
     };
     window.addEventListener("pointerdown", touchOrPointer);
@@ -455,6 +493,33 @@ export function KioskClient({ initialData }: Props) {
     };
   }, []);
 
+  let counselorsList: { id: string; name: string; photoUrl: string | null; category?: string; position?: string }[] = [];
+  if (data.activeShiftCounselors) {
+    try {
+      counselorsList = JSON.parse(data.activeShiftCounselors);
+    } catch {
+      // ignore
+    }
+  }
+  const hasCounselors = Array.isArray(counselorsList) && counselorsList.length > 0 && counselorsList.some(c => c.name?.trim() !== "");
+
+  const groupedCounselors: { [category: string]: typeof counselorsList } = {};
+  if (hasCounselors) {
+    counselorsList.forEach((c) => {
+      const cat = c.category?.trim() || "Вожатые";
+      if (!groupedCounselors[cat]) {
+        groupedCounselors[cat] = [];
+      }
+      groupedCounselors[cat].push(c);
+    });
+  }
+
+  const sortedCategories = Object.keys(groupedCounselors).sort((a, b) => {
+    if (a === "Администрация") return -1;
+    if (b === "Администрация") return 1;
+    return a.localeCompare(b, "ru-RU");
+  });
+
   const locationName = weather?.location ?? "Красная Горка";
   const todayLabel = formatDate(now);
   const formatShortDate = (iso: string) =>
@@ -536,6 +601,11 @@ export function KioskClient({ initialData }: Props) {
             <button className="nav-btn" onClick={onMusicClick}>
               🎵 Предложить песню
             </button>
+            {hasCounselors ? (
+              <button className="nav-btn" onClick={() => onSelect("counselors")}>
+                👥 Сотрудники смены
+              </button>
+            ) : null}
             {data.sections.map((section) => (
               <button
                 key={section.id}
@@ -746,6 +816,93 @@ export function KioskClient({ initialData }: Props) {
               <>
                 <h2>Предложить песню диджею</h2>
                 <SongSuggestPanel />
+              </>
+            )}
+
+            {panel === "counselors" && (
+              <>
+                <h2>Сотрудники смены</h2>
+                <div style={{ display: "flex", flexDirection: "column", gap: 24, marginTop: 16 }}>
+                  {sortedCategories.map((category) => (
+                    <div key={category} className="counselor-group">
+                      <h3 style={{
+                        fontSize: 20,
+                        fontWeight: 700,
+                        color: "var(--accent)",
+                        borderBottom: "2px solid var(--bg-deep)",
+                        paddingBottom: 6,
+                        marginBottom: 16
+                      }}>
+                        {category}
+                      </h3>
+                      <div className="counselors-grid" style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                        gap: 16
+                      }}>
+                        {groupedCounselors[category].map((counselor) => (
+                          <div key={counselor.id} className="card counselor-card" style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            padding: 16,
+                            textAlign: "center"
+                          }}>
+                            <div className="counselor-photo-wrapper" style={{
+                              width: 120,
+                              height: 120,
+                              borderRadius: "50%",
+                              overflow: "hidden",
+                              backgroundColor: "var(--bg-deep)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              border: "3px solid #f3d6a0",
+                              marginBottom: 12
+                            }}>
+                              {counselor.photoUrl ? (
+                                <img
+                                  src={counselor.photoUrl}
+                                  alt={counselor.name}
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover"
+                                  }}
+                                />
+                              ) : (
+                                <svg viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" strokeWidth="1.5" style={{ width: 50, height: 50 }}>
+                                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                  <circle cx="12" cy="7" r="4" />
+                                </svg>
+                              )}
+                            </div>
+                            <div className="counselor-name" style={{
+                              fontSize: 16,
+                              fontWeight: 600,
+                              color: "var(--ink)",
+                              lineHeight: "1.3",
+                              wordBreak: "break-word"
+                            }}>
+                              {counselor.name}
+                            </div>
+                            {counselor.position && (
+                              <div className="counselor-position" style={{
+                                fontSize: 13,
+                                color: "var(--ink-muted)",
+                                marginTop: 4,
+                                lineHeight: "1.2",
+                                wordBreak: "break-word"
+                              }}>
+                                {counselor.position}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </>
             )}
           </div>

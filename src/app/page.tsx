@@ -3,6 +3,10 @@ import { getTodayRange } from "@/lib/date";
 import { runMediaCleanup } from "@/lib/cleanup";
 import { KioskClient } from "@/components/KioskClient";
 import { KioskInteractionMode } from "@/components/KioskInteractionMode";
+import { getActiveOrLatestShift } from "@/lib/shifts";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function KioskPage() {
   const { start } = getTodayRange();
@@ -12,38 +16,40 @@ export default async function KioskPage() {
 
   await runMediaCleanup();
 
+  const activeShift = await getActiveOrLatestShift();
+
   const [media, scheduleImages, menuImages, sections, reviews] =
     await Promise.all([
-    prisma.media.findMany({
-      where: { isActive: true, category: "MAIN" },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-    }),
-    prisma.media.findMany({
-      where: {
-        isActive: true,
-        category: "SCHEDULE",
-        dateFor: { gte: start, lte: end14 },
-      },
-      orderBy: [{ dateFor: "asc" }, { createdAt: "asc" }],
-    }),
-    prisma.media.findMany({
-      where: {
-        isActive: true,
-        category: "MENU",
-        dateFor: { gte: start, lte: end14 },
-      },
-      orderBy: [{ dateFor: "asc" }, { createdAt: "asc" }],
-    }),
-    prisma.section.findMany({
-      where: { isActive: true },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    }),
-    prisma.review.findMany({
-      where: { status: "APPROVED" },
-      orderBy: [{ createdAt: "desc" }],
-      take: 20,
-    }),
-  ]);
+      prisma.media.findMany({
+        where: { isActive: true, category: "MAIN" },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+      }),
+      prisma.media.findMany({
+        where: {
+          isActive: true,
+          category: "SCHEDULE",
+          dateFor: { gte: start, lte: end14 },
+        },
+        orderBy: [{ dateFor: "asc" }, { createdAt: "asc" }],
+      }),
+      prisma.media.findMany({
+        where: {
+          isActive: true,
+          category: "MENU",
+          dateFor: { gte: start, lte: end14 },
+        },
+        orderBy: [{ dateFor: "asc" }, { createdAt: "asc" }],
+      }),
+      prisma.section.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      }),
+      prisma.review.findMany({
+        where: { status: "APPROVED" },
+        orderBy: [{ createdAt: "desc" }],
+        take: 20,
+      }),
+    ]);
 
   return (
     <>
@@ -63,6 +69,7 @@ export default async function KioskPage() {
           })),
           sections,
           reviews,
+          activeShiftCounselors: activeShift?.counselors || null,
           serverTime: new Date().toISOString(),
         }}
       />

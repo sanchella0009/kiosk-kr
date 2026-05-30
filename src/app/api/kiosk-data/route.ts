@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getTodayRange } from "@/lib/date";
 import { runMediaCleanup } from "@/lib/cleanup";
+import { getActiveOrLatestShift } from "@/lib/shifts";
 
 export async function GET() {
   const now = new Date();
@@ -10,13 +11,7 @@ export async function GET() {
   end14.setDate(end14.getDate() + 13);
   end14.setHours(23, 59, 59, 999);
 
-  const activeShift = await prisma.shift.findFirst({
-    where: {
-      startDate: { lte: now },
-      endDate: { gte: now },
-    },
-    orderBy: { startDate: "desc" },
-  });
+  const activeShift = await getActiveOrLatestShift(now);
 
   const rangeStart = activeShift
     ? new Date(
@@ -86,6 +81,7 @@ export async function GET() {
     })),
     sections,
     reviews,
+    activeShiftCounselors: activeShift?.counselors || null,
     serverTime: new Date().toISOString(),
   });
 }

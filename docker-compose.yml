@@ -13,7 +13,7 @@ services:
       - kiosk-ws
       - kiosk-music
   kiosk-ws:
-    image: node:20
+    image: node:20-alpine
     working_dir: /app
     volumes:
       - .:/app
@@ -44,7 +44,7 @@ services:
       retries: 3
       start_period: 10s
   kiosk-bot:
-    image: node:20
+    image: node:20-alpine
     working_dir: /app
     env_file:
       - .env

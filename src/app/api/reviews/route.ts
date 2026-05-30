@@ -27,13 +27,20 @@ export async function POST(request: Request) {
     },
   });
 
-  await sendReviewToTelegram({
-    id: review.id,
-    name: review.name,
-    rating: review.rating,
-    message: review.message,
-    createdAt: review.createdAt,
-  });
+  // Non-blocking background notification to Telegram
+  void (async () => {
+    try {
+      await sendReviewToTelegram({
+        id: review.id,
+        name: review.name,
+        rating: review.rating,
+        message: review.message,
+        createdAt: review.createdAt,
+      });
+    } catch (error) {
+      console.error("Failed to send review to Telegram", error);
+    }
+  })();
 
   return NextResponse.json({ ok: true });
 }

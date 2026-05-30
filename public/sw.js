@@ -1,4 +1,4 @@
-const CACHE_NAME = "kiosk-cache-v4";
+const CACHE_NAME = "kiosk-cache-v5";
 const STATIC_ASSETS = ["/", "/manifest.json", "/favicon.ico"];
 
 self.addEventListener("install", (event) => {
@@ -31,6 +31,20 @@ self.addEventListener("fetch", (event) => {
 
   if (request.headers.has("range")) {
     event.respondWith(fetch(request));
+    return;
+  }
+
+  // Network-First for root route to ensure dynamic updates when online, fall back to cache when offline
+  if (pathname === "/") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
     return;
   }
 
