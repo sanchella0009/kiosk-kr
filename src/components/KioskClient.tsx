@@ -102,6 +102,7 @@ export function KioskClient({ initialData }: Props) {
     }
     return null;
   });
+  const [squadDetailView, setSquadDetailView] = useState(false);
   const [scheduleKey, setScheduleKey] = useState<string | null>(null);
   const [menuKey, setMenuKey] = useState<string | null>(null);
   const [showEarlierSchedule, setShowEarlierSchedule] = useState(false);
@@ -176,6 +177,9 @@ export function KioskClient({ initialData }: Props) {
     }
     if (isOnline) {
       refreshData();
+    }
+    if (next === "squads") {
+      setSquadDetailView(false);
     }
     setPanel(next);
     if (next !== "home") {
@@ -995,105 +999,194 @@ export function KioskClient({ initialData }: Props) {
 
             {panel === "squads" && (
               <>
-                <h2>Отряды смены</h2>
-                <div className="date-tabs" style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24, marginTop: 16 }}>
-                  {data.squads?.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      className={`date-tab ${selectedSquadId === s.id ? "active" : ""}`}
-                      onClick={() => setSelectedSquadId(s.id)}
-                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", fontSize: 16 }}
-                    >
-                      {s.photoUrl ? (
-                        <img src={s.photoUrl} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
-                      ) : (
-                        <span>👥</span>
-                      )}
-                      {s.name}
-                    </button>
-                  ))}
-                </div>
-
-                {selectedSquad ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-                    {selectedSquad.photoUrl && (
-                      <div style={{ display: "flex", justifyContent: "center" }}>
-                        <img
-                          src={selectedSquad.photoUrl}
-                          alt={selectedSquad.name}
-                          style={{
-                            maxWidth: "100%",
-                            maxHeight: 450,
-                            borderRadius: 16,
-                            border: "3px solid #f3d6a0",
-                            objectFit: "cover"
+                {!squadDetailView ? (
+                  <>
+                    <h2>Отряды смены</h2>
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                      gap: 20,
+                      marginTop: 20
+                    }}>
+                      {data.squads?.map((squad) => (
+                        <div
+                          key={squad.id}
+                          onClick={() => {
+                            setSelectedSquadId(squad.id);
+                            setSquadDetailView(true);
                           }}
-                        />
-                      </div>
-                    )}
-
-                    <div style={{ overflowX: "auto", border: "1px solid #f3d6a0", borderRadius: 12, background: "#fff" }}>
-                      <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center" }}>
-                        <thead>
-                          <tr style={{ background: "var(--bg-deep)", borderBottom: "2px solid #f3d6a0" }}>
-                            <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 200, position: "sticky", left: 0, background: "var(--bg-deep)", zIndex: 10, borderRight: "1px solid #f3d6a0" }}>Ребенок</th>
-                            {shiftDates.map((d) => (
-                              <th key={d.toISOString()} style={{ padding: "14px 10px", minWidth: 70, fontWeight: 700 }}>
-                                {formatDayMonth(d)}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedSquad.children.map((child) => (
-                            <tr key={child.id} style={{ borderBottom: "1px solid #f9ebd2", opacity: child.isLeft ? 0.4 : 1 }}>
-                              <td style={{
-                                padding: "14px 16px",
-                                textAlign: "left",
-                                fontWeight: 600,
-                                position: "sticky",
-                                left: 0,
-                                background: "#fff",
-                                borderRight: "1px solid #f3d6a0",
-                                textDecoration: child.isLeft ? "line-through" : "none"
-                              }}>
-                                {child.name} {child.isLeft && <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 400 }}>(выбыл)</span>}
-                              </td>
-                              {shiftDates.map((date) => {
-                                const dateKey = date.toISOString().slice(0, 10);
-                                const isBest = child.bestDays.some(
-                                  (b) => new Date(b.date).toISOString().slice(0, 10) === dateKey
-                                );
-                                return (
-                                  <td key={date.toISOString()} style={{ padding: 8 }}>
-                                    {isBest && data.campLogo ? (
-                                      <img
-                                        src={data.campLogo}
-                                        alt="Лого"
-                                        style={{ width: 36, height: 36, objectFit: "contain", margin: "0 auto" }}
-                                      />
-                                    ) : isBest ? (
-                                      <span style={{ fontSize: 24 }}>⭐</span>
-                                    ) : null}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
-                          {selectedSquad.children.length === 0 && (
-                            <tr>
-                              <td colSpan={shiftDates.length + 1} style={{ padding: 24, color: "var(--ink-muted)", fontStyle: "italic" }}>
-                                В этом отряде пока нет детей.
-                              </td>
-                            </tr>
+                          style={{
+                            position: "relative",
+                            height: 200,
+                            borderRadius: 16,
+                            overflow: "hidden",
+                            cursor: "pointer",
+                            boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+                            border: "2px solid #f3d6a0",
+                            backgroundImage: squad.photoUrl ? `url(${squad.photoUrl})` : "linear-gradient(135deg, #fcecd6 0%, #f3d6a0 100%)",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "space-between",
+                            padding: 16,
+                            transition: "transform 0.2s"
+                          }}
+                          className="squad-tile"
+                        >
+                          {squad.photoUrl && (
+                            <div style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              background: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.7) 100%)",
+                              zIndex: 1
+                            }} />
                           )}
-                        </tbody>
-                      </table>
+
+                          <div style={{
+                            position: "relative",
+                            zIndex: 2,
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                            width: "100%"
+                          }}>
+                            <h3 style={{
+                              margin: 0,
+                              color: squad.photoUrl ? "#fff" : "var(--ink)",
+                              fontSize: 20,
+                              fontWeight: 700,
+                              textShadow: squad.photoUrl ? "1px 1px 3px rgba(0,0,0,0.8)" : "none"
+                            }}>
+                              {squad.name}
+                            </h3>
+                            <span style={{
+                              background: "var(--accent-2)",
+                              color: "#fff",
+                              padding: "4px 10px",
+                              borderRadius: 8,
+                              fontSize: 14,
+                              fontWeight: 800,
+                              boxShadow: "0 2px 6px rgba(0,0,0,0.15)"
+                            }}>
+                              {getSquadPoints(squad.id)} б.
+                            </span>
+                          </div>
+                          
+                          <div style={{
+                            position: "relative",
+                            zIndex: 2,
+                            color: squad.photoUrl ? "#eee" : "var(--ink-muted)",
+                            fontSize: 14,
+                            fontWeight: 600,
+                            textShadow: squad.photoUrl ? "1px 1px 2px rgba(0,0,0,0.8)" : "none"
+                          }}>
+                            Детей: {squad.children.length}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  </>
                 ) : (
-                  <div style={{ color: "var(--ink-muted)", fontStyle: "italic" }}>Отряды не созданы</div>
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                      <button className="btn-ghost" onClick={() => setSquadDetailView(false)}>
+                        ← К списку отрядов
+                      </button>
+                      <h2 style={{ margin: 0 }}>
+                        {selectedSquad ? selectedSquad.name : ""}
+                      </h2>
+                    </div>
+
+                    {selectedSquad ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                        <div className="kiosk-media card" style={{
+                          height: 400,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          overflow: "hidden",
+                          background: "#000",
+                          borderRadius: 16,
+                          border: "3px solid #f3d6a0"
+                        }}>
+                          {selectedSquad.photoUrl ? (
+                            <img
+                              src={selectedSquad.photoUrl}
+                              alt={selectedSquad.name}
+                              style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                            />
+                          ) : (
+                            <div style={{ color: "#fff", fontStyle: "italic" }}>Фото отряда не загружено</div>
+                          )}
+                        </div>
+
+                        <div style={{ overflowX: "auto", border: "1px solid #f3d6a0", borderRadius: 12, background: "#fff" }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center" }}>
+                            <thead>
+                              <tr style={{ background: "var(--bg-deep)", borderBottom: "2px solid #f3d6a0" }}>
+                                <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 200, position: "sticky", left: 0, background: "var(--bg-deep)", zIndex: 10, borderRight: "1px solid #f3d6a0" }}>Ребенок</th>
+                                {shiftDates.map((d) => (
+                                  <th key={d.toISOString()} style={{ padding: "14px 10px", minWidth: 70, fontWeight: 700 }}>
+                                    {formatDayMonth(d)}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedSquad.children.map((child) => (
+                                <tr key={child.id} style={{ borderBottom: "1px solid #f9ebd2", opacity: child.isLeft ? 0.4 : 1 }}>
+                                  <td style={{
+                                    padding: "14px 16px",
+                                    textAlign: "left",
+                                    fontWeight: 600,
+                                    position: "sticky",
+                                    left: 0,
+                                    background: "#fff",
+                                    borderRight: "1px solid #f3d6a0",
+                                    textDecoration: child.isLeft ? "line-through" : "none"
+                                  }}>
+                                    {child.name} {child.isLeft && <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 400 }}>(выбыл)</span>}
+                                  </td>
+                                  {shiftDates.map((date) => {
+                                    const dateKey = date.toISOString().slice(0, 10);
+                                    const isBest = child.bestDays.some(
+                                      (b) => new Date(b.date).toISOString().slice(0, 10) === dateKey
+                                    );
+                                    return (
+                                      <td key={date.toISOString()} style={{ padding: 8 }}>
+                                        {isBest && data.campLogo ? (
+                                          <img
+                                            src={data.campLogo}
+                                            alt="Лого"
+                                            style={{ width: 36, height: 36, objectFit: "contain", margin: "0 auto" }}
+                                          />
+                                        ) : isBest ? (
+                                          <span style={{ fontSize: 24 }}>⭐</span>
+                                        ) : null}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                              {selectedSquad.children.length === 0 && (
+                                <tr>
+                                  <td colSpan={shiftDates.length + 1} style={{ padding: 24, color: "var(--ink-muted)", fontStyle: "italic" }}>
+                                    В этом отряде пока нет детей.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ color: "var(--ink-muted)", fontStyle: "italic" }}>Отряды не созданы</div>
+                    )}
+                  </>
                 )}
               </>
             )}

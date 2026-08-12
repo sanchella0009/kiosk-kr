@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   saveSquadAction,
@@ -11,6 +11,7 @@ import {
   deleteChildAction,
   setBestChildOfDayAction,
   saveCampLogoAction,
+  updateSquadsOrderAction,
 } from "@/app/actions/squads";
 
 type Child = {
@@ -45,6 +46,33 @@ export function SquadsAdmin({ shift, shifts, initialSquads, initialLogoUrl }: Pr
   const router = useRouter();
   const [squads, setSquads] = useState<Squad[]>(initialSquads);
   const [campLogo, setCampLogo] = useState<string | null>(initialLogoUrl);
+
+  useEffect(() => {
+    setSquads(initialSquads);
+  }, [initialSquads]);
+
+  const moveSquad = async (index: number, direction: "up" | "down") => {
+    const nextIndex = direction === "up" ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= squads.length) return;
+
+    const newSquads = [...squads];
+    const temp = newSquads[index];
+    newSquads[index] = newSquads[nextIndex];
+    newSquads[nextIndex] = temp;
+
+    setSquads(newSquads);
+
+    const squadIds = newSquads.map((s) => s.id);
+    const res = await updateSquadsOrderAction(squadIds);
+    if (!res.success) {
+      alert("Ошибка при изменении порядка: " + res.error);
+      router.refresh();
+    } else {
+      setMessage("Порядок отрядов изменен!");
+      setTimeout(() => setMessage(null), 3000);
+      router.refresh();
+    }
+  };
 
   const [selectedSquadId, setSelectedSquadId] = useState<string | null>(
     initialSquads.length > 0 ? initialSquads[0].id : null
@@ -350,6 +378,27 @@ export function SquadsAdmin({ shift, shifts, initialSquads, initialLogoUrl }: Pr
                       <div style={{ fontSize: 12, color: "var(--ink-muted)", marginTop: 2 }}>
                         Детей: {squad.children.length} (выбыло: {squad.children.filter((c) => c.isLeft).length})
                       </div>
+                    </div>
+                    
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        style={{ padding: "2px 6px", fontSize: 11, minWidth: 24, lineHeight: 1 }}
+                        disabled={squads.indexOf(squad) === 0}
+                        onClick={() => moveSquad(squads.indexOf(squad), "up")}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        style={{ padding: "2px 6px", fontSize: 11, minWidth: 24, lineHeight: 1 }}
+                        disabled={squads.indexOf(squad) === squads.length - 1}
+                        onClick={() => moveSquad(squads.indexOf(squad), "down")}
+                      >
+                        ▼
+                      </button>
                     </div>
                   </div>
 

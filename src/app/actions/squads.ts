@@ -319,3 +319,22 @@ export async function removeSquadOfDayAction(squadId: string, dateStr: string) {
     return { success: false, error: error.message || "Ошибка при удалении отряда дня" };
   }
 }
+
+export async function updateSquadsOrderAction(squadIds: string[]) {
+  await requireAuth();
+  try {
+    await prisma.$transaction(
+      squadIds.map((id, index) =>
+        prisma.squad.update({
+          where: { id },
+          data: { sortOrder: index },
+        })
+      )
+    );
+    await broadcastRefresh();
+    revalidatePath("/adm/squads");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Ошибка при изменении порядка" };
+  }
+}

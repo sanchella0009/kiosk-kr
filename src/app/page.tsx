@@ -60,7 +60,7 @@ export default async function KioskPage() {
                 orderBy: { name: "asc" },
               },
             },
-            orderBy: { name: "asc" },
+            orderBy: { sortOrder: "asc" },
           })
         : Promise.resolve([]),
       activeShift

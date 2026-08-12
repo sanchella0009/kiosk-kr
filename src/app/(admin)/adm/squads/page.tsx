@@ -53,7 +53,7 @@ export default async function SquadsAdminPage({
         orderBy: { name: "asc" },
       },
     },
-    orderBy: { name: "asc" },
+    orderBy: { sortOrder: "asc" },
   });
 
   const logoUrl = await getCampLogoAction();

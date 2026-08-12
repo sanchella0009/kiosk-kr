@@ -44,7 +44,7 @@ export default async function RatingsAdminPage({
   // Fetch squads in this shift
   const squads = await prisma.squad.findMany({
     where: { shiftId: selectedShiftId },
-    orderBy: { name: "asc" },
+    orderBy: { sortOrder: "asc" },
   });
 
   // Fetch events that occur during this shift

@@ -189,6 +189,7 @@ model Squad {
   id          String       @id @default(cuid())
   name        String
   photoUrl    String?
+  sortOrder   Int          @default(0)
   shiftId     String
   shift       Shift        @relation(fields: [shiftId], references: [id], onDelete: Cascade)
   createdAt   DateTime     @default(now())

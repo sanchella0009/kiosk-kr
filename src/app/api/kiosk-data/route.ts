@@ -76,7 +76,7 @@ export async function GET() {
                 orderBy: { name: "asc" },
               },
             },
-            orderBy: { name: "asc" },
+            orderBy: { sortOrder: "asc" },
           })
         : Promise.resolve([]),
       activeShift
