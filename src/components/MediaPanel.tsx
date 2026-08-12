@@ -25,6 +25,7 @@ export function MediaPanel({ items }: Props) {
   const bookContainerRef = useRef<HTMLDivElement>(null);
   const pageFlipRef = useRef<any | null>(null);
   const [index, setIndex] = useState(0);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const timerRef = useRef<number | null>(null);
 
@@ -40,25 +41,38 @@ export function MediaPanel({ items }: Props) {
     }
   };
 
-  // Initialize PageFlip
+  // Monitor size of the parent element to resolve 0-size initialization issue
   useEffect(() => {
-    if (!bookContainerRef.current || activeItems.length === 0) return;
+    const htmlElement = bookContainerRef.current;
+    if (!htmlElement) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setSize({ width: Math.round(width), height: Math.round(height) });
+        }
+      }
+    });
+
+    observer.observe(htmlElement);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  // Initialize PageFlip with resolved size
+  useEffect(() => {
+    if (!bookContainerRef.current || activeItems.length === 0 || !size) return;
 
     let flipBook: any = null;
-    let timerId: any = null;
+    const htmlElement = bookContainerRef.current;
 
     const initBook = () => {
-      const htmlElement = bookContainerRef.current;
-      if (!htmlElement) return;
-
-      const rect = htmlElement.getBoundingClientRect();
-      const roundedWidth = Math.round(rect.width) || 400;
-      const roundedHeight = Math.round(rect.height) || 600;
-
       try {
         flipBook = new PageFlip(htmlElement, {
-          width: roundedWidth,
-          height: roundedHeight,
+          width: size.width,
+          height: size.height,
           size: "stretch",
           minWidth: 100,
           maxWidth: 2000,
@@ -69,7 +83,7 @@ export function MediaPanel({ items }: Props) {
           showCover: false,
           mobileScrollSupport: false,
           usePortrait: true,
-          clickEventForward: true, // forward clicks to sub-elements
+          clickEventForward: true, // Let buttons be clickable
         });
 
         const domElements = htmlElement.querySelectorAll(".book-page-element");
@@ -79,19 +93,38 @@ export function MediaPanel({ items }: Props) {
           setIsInitialized(true);
 
           flipBook.on("flip", (e: any) => {
-            setIndex(e.data);
+            const nextIdx = e.data;
+            setIndex(nextIdx);
+
+            // Handle video play/pause in raw DOM to avoid React reconciliation conflicts
+            const pages = htmlElement.querySelectorAll(".book-page-element");
+            pages.forEach((page: any, pIdx: number) => {
+              const video = page.querySelector("video");
+              if (video) {
+                if (pIdx === nextIdx) {
+                  video.currentTime = 0;
+                  video.play().catch(() => {});
+                } else {
+                  video.pause();
+                }
+              }
+            });
           });
+
+          // Autoplay first page video if exists
+          const firstVideo = domElements[0]?.querySelector("video");
+          if (firstVideo) {
+            firstVideo.play().catch(() => {});
+          }
         }
       } catch (error) {
         console.error("Failed to initialize PageFlip:", error);
       }
     };
 
-    // Delay initialization slightly to let parent container dimensions compute
-    timerId = setTimeout(initBook, 300);
+    initBook();
 
     return () => {
-      clearTimeout(timerId);
       if (flipBook) {
         try {
           flipBook.destroy();
@@ -102,7 +135,7 @@ export function MediaPanel({ items }: Props) {
       pageFlipRef.current = null;
       setIsInitialized(false);
     };
-  }, [activeItems]);
+  }, [activeItems, size]);
 
   // Slideshow Timer logic
   useEffect(() => {
@@ -181,9 +214,11 @@ export function MediaPanel({ items }: Props) {
         style={{
           width: "100%",
           height: "100%",
+          opacity: isInitialized ? 1 : 0,
+          transition: "opacity 0.3s ease",
         }}
       >
-        {activeItems.map((item, idx) => (
+        {activeItems.map((item) => (
           <div
             key={item.id}
             className="book-page-element"
@@ -212,7 +247,6 @@ export function MediaPanel({ items }: Props) {
             ) : (
               <video
                 src={item.url}
-                autoPlay={index === idx}
                 muted
                 playsInline
                 controls={false}
