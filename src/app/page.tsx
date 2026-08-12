@@ -18,7 +18,7 @@ export default async function KioskPage() {
 
   const activeShift = await getActiveOrLatestShift();
 
-  const [media, scheduleImages, menuImages, sections, reviews] =
+  const [media, scheduleImages, menuImages, sections, reviews, squads, events, campLogoSetting] =
     await Promise.all([
       prisma.media.findMany({
         where: { isActive: true, category: "MAIN" },
@@ -49,7 +49,50 @@ export default async function KioskPage() {
         orderBy: [{ createdAt: "desc" }],
         take: 20,
       }),
+      activeShift
+        ? prisma.squad.findMany({
+            where: { shiftId: activeShift.id },
+            include: {
+              children: {
+                include: {
+                  bestDays: true,
+                },
+                orderBy: { name: "asc" },
+              },
+            },
+            orderBy: { name: "asc" },
+          })
+        : Promise.resolve([]),
+      activeShift
+        ? prisma.event.findMany({
+            where: {
+              date: {
+                gte: activeShift.startDate,
+                lte: activeShift.endDate,
+              },
+            },
+            include: {
+              places: true,
+            },
+            orderBy: {
+              createdAt: "desc",
+            },
+          })
+        : Promise.resolve([]),
+      prisma.campSetting.findUnique({
+        where: { key: "camp_logo" },
+      }),
     ]);
+
+  const squadOfDays = activeShift && squads.length > 0
+    ? await prisma.squadOfDay.findMany({
+        where: {
+          squadId: {
+            in: squads.map((s) => s.id),
+          },
+        },
+      })
+    : [];
 
   return (
     <>
@@ -70,6 +113,41 @@ export default async function KioskPage() {
           sections,
           reviews,
           activeShiftCounselors: activeShift?.counselors || null,
+          squads: squads.map((s) => ({
+            id: s.id,
+            name: s.name,
+            photoUrl: s.photoUrl,
+            children: s.children.map((c) => ({
+              id: c.id,
+              name: c.name,
+              isLeft: c.isLeft,
+              bestDays: c.bestDays.map((b) => ({
+                date: b.date.toISOString(),
+              })),
+            })),
+          })),
+          events: events.map((e) => ({
+            id: e.id,
+            name: e.name,
+            places: e.places.map((p) => ({
+              squadId: p.squadId,
+              place: p.place,
+            })),
+          })),
+          squadOfDays: squadOfDays.map((sd) => ({
+            squadId: sd.squadId,
+            date: sd.date.toISOString(),
+            stars: sd.stars,
+          })),
+          campLogo: campLogoSetting?.value || null,
+          activeShift: activeShift
+            ? {
+                id: activeShift.id,
+                title: activeShift.title,
+                startDate: activeShift.startDate.toISOString(),
+                endDate: activeShift.endDate.toISOString(),
+              }
+            : null,
           serverTime: new Date().toISOString(),
         }}
       />

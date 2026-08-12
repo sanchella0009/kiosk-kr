@@ -16,6 +16,8 @@ export function AdminSidebar({ username }: Props) {
     { href: "/adm/analytics", label: "Статистика", icon: "📊" },
     { href: "/adm/media", label: "Медиа-слайды", icon: "🖼️" },
     { href: "/adm/shifts", label: "Смены и вожатые", icon: "🔄" },
+    { href: "/adm/squads", label: "Отряды и дети", icon: "👥" },
+    { href: "/adm/ratings", label: "Рейтинг отрядов", icon: "🏆" },
     { href: "/adm/sections", label: "Разделы", icon: "ℹ️" },
     { href: "/adm/reviews", label: "Отзывы", icon: "⭐" },
     { href: "/adm/songs", label: "Песни", icon: "🎵" },

@@ -49,6 +49,34 @@ type KioskData = {
   sections: Section[];
   reviews: Review[];
   activeShiftCounselors?: string | null;
+  squads?: {
+    id: string;
+    name: string;
+    photoUrl: string | null;
+    children: {
+      id: string;
+      name: string;
+      isLeft: boolean;
+      bestDays: { date: string }[];
+    }[];
+  }[];
+  events?: {
+    id: string;
+    name: string;
+    places: { squadId: string; place: number }[];
+  }[];
+  squadOfDays?: {
+    squadId: string;
+    date: string;
+    stars: number;
+  }[];
+  campLogo?: string | null;
+  activeShift?: {
+    id: string;
+    title: string | null;
+    startDate: string;
+    endDate: string;
+  } | null;
   serverTime: string;
 };
 
@@ -56,7 +84,7 @@ type Props = {
   initialData: KioskData;
 };
 
-type Panel = "home" | "schedule" | "menu" | "review" | "section" | "music" | "counselors";
+type Panel = "home" | "schedule" | "menu" | "review" | "section" | "music" | "counselors" | "squads" | "ratings";
 
 const INACTIVITY_MS = 60_000;
 const WEATHER_MIN = 5 * 60 * 1000;
@@ -68,6 +96,12 @@ export function KioskClient({ initialData }: Props) {
   const [panel, setPanel] = useState<Panel>("home");
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const [selectedSquadId, setSelectedSquadId] = useState<string | null>(() => {
+    if (initialData.squads && initialData.squads.length > 0) {
+      return initialData.squads[0].id;
+    }
+    return null;
+  });
   const [scheduleKey, setScheduleKey] = useState<string | null>(null);
   const [menuKey, setMenuKey] = useState<string | null>(null);
   const [showEarlierSchedule, setShowEarlierSchedule] = useState(false);
@@ -115,6 +149,13 @@ export function KioskClient({ initialData }: Props) {
       if (!res.ok) throw new Error("offline");
       const payload = (await res.json()) as KioskData;
       setData(payload);
+      setSelectedSquadId((prev) => {
+        if (prev) return prev;
+        if (payload.squads && payload.squads.length > 0) {
+          return payload.squads[0].id;
+        }
+        return null;
+      });
       setNow(new Date(payload.serverTime));
       setOnlineState(true);
     } catch {
@@ -503,6 +544,42 @@ export function KioskClient({ initialData }: Props) {
   }
   const hasCounselors = Array.isArray(counselorsList) && counselorsList.length > 0 && counselorsList.some(c => c.name?.trim() !== "");
 
+  const hasSquads = Array.isArray(data.squads) && data.squads.length > 0;
+
+  const getShiftDates = () => {
+    if (!data.activeShift) return [];
+    const dates: Date[] = [];
+    const current = new Date(data.activeShift.startDate);
+    const end = new Date(data.activeShift.endDate);
+    current.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+
+    while (current <= end) {
+      dates.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+    return dates;
+  };
+
+  const shiftDates = getShiftDates();
+
+  const formatDayMonth = (d: Date) => d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+
+  const getSquadPoints = (squadId: string) => {
+    let total = 0;
+    data.events?.forEach((evt) => {
+      const placeRecord = evt.places.find((p) => p.squadId === squadId);
+      if (placeRecord) {
+        if (placeRecord.place === 1) total += 3;
+        else if (placeRecord.place === 2) total += 2;
+        else if (placeRecord.place === 3) total += 1;
+      }
+    });
+    return total;
+  };
+
+  const selectedSquad = data.squads?.find((s) => s.id === selectedSquadId) || (data.squads && data.squads.length > 0 ? data.squads[0] : null);
+
   const groupedCounselors: { [category: string]: typeof counselorsList } = {};
   if (hasCounselors) {
     counselorsList.forEach((c) => {
@@ -601,10 +678,20 @@ export function KioskClient({ initialData }: Props) {
             <button className="nav-btn" onClick={onMusicClick}>
               🎵 Предложить песню
             </button>
-            {hasCounselors ? (
+             {hasCounselors ? (
               <button className="nav-btn" onClick={() => onSelect("counselors")}>
                 👥 Сотрудники смены
               </button>
+            ) : null}
+            {hasSquads ? (
+              <>
+                <button className="nav-btn" onClick={() => onSelect("squads")}>
+                  👥 Отряды
+                </button>
+                <button className="nav-btn" onClick={() => onSelect("ratings")}>
+                  🏆 Рейтинг отрядов
+                </button>
+              </>
             ) : null}
             {data.sections.map((section) => (
               <button
@@ -902,6 +989,201 @@ export function KioskClient({ initialData }: Props) {
                       </div>
                     </div>
                   ))}
+                </div>
+              </>
+            )}
+
+            {panel === "squads" && (
+              <>
+                <h2>Отряды смены</h2>
+                <div className="date-tabs" style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24, marginTop: 16 }}>
+                  {data.squads?.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className={`date-tab ${selectedSquadId === s.id ? "active" : ""}`}
+                      onClick={() => setSelectedSquadId(s.id)}
+                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", fontSize: 16 }}
+                    >
+                      {s.photoUrl ? (
+                        <img src={s.photoUrl} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
+                      ) : (
+                        <span>👥</span>
+                      )}
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+
+                {selectedSquad ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                    {selectedSquad.photoUrl && (
+                      <div style={{ display: "flex", justifyContent: "center" }}>
+                        <img
+                          src={selectedSquad.photoUrl}
+                          alt={selectedSquad.name}
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: 450,
+                            borderRadius: 16,
+                            border: "3px solid #f3d6a0",
+                            objectFit: "cover"
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div style={{ overflowX: "auto", border: "1px solid #f3d6a0", borderRadius: 12, background: "#fff" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center" }}>
+                        <thead>
+                          <tr style={{ background: "var(--bg-deep)", borderBottom: "2px solid #f3d6a0" }}>
+                            <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 200, position: "sticky", left: 0, background: "var(--bg-deep)", zIndex: 10, borderRight: "1px solid #f3d6a0" }}>Ребенок</th>
+                            {shiftDates.map((d) => (
+                              <th key={d.toISOString()} style={{ padding: "14px 10px", minWidth: 70, fontWeight: 700 }}>
+                                {formatDayMonth(d)}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedSquad.children.map((child) => (
+                            <tr key={child.id} style={{ borderBottom: "1px solid #f9ebd2", opacity: child.isLeft ? 0.4 : 1 }}>
+                              <td style={{
+                                padding: "14px 16px",
+                                textAlign: "left",
+                                fontWeight: 600,
+                                position: "sticky",
+                                left: 0,
+                                background: "#fff",
+                                borderRight: "1px solid #f3d6a0",
+                                textDecoration: child.isLeft ? "line-through" : "none"
+                              }}>
+                                {child.name} {child.isLeft && <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 400 }}>(выбыл)</span>}
+                              </td>
+                              {shiftDates.map((date) => {
+                                const dateKey = date.toISOString().slice(0, 10);
+                                const isBest = child.bestDays.some(
+                                  (b) => new Date(b.date).toISOString().slice(0, 10) === dateKey
+                                );
+                                return (
+                                  <td key={date.toISOString()} style={{ padding: 8 }}>
+                                    {isBest && data.campLogo ? (
+                                      <img
+                                        src={data.campLogo}
+                                        alt="Лого"
+                                        style={{ width: 36, height: 36, objectFit: "contain", margin: "0 auto" }}
+                                      />
+                                    ) : isBest ? (
+                                      <span style={{ fontSize: 24 }}>⭐</span>
+                                    ) : null}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                          {selectedSquad.children.length === 0 && (
+                            <tr>
+                              <td colSpan={shiftDates.length + 1} style={{ padding: 24, color: "var(--ink-muted)", fontStyle: "italic" }}>
+                                В этом отряде пока нет детей.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ color: "var(--ink-muted)", fontStyle: "italic" }}>Отряды не созданы</div>
+                )}
+              </>
+            )}
+
+            {panel === "ratings" && (
+              <>
+                <h2>Рейтинг отрядов</h2>
+                <div style={{ display: "flex", flexDirection: "column", gap: 30, marginTop: 16 }}>
+                  {/* Event Rankings Table */}
+                  <div style={{ overflowX: "auto", border: "1px solid #f3d6a0", borderRadius: 12, background: "#fff" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center" }}>
+                      <thead>
+                        <tr style={{ background: "var(--bg-deep)", borderBottom: "2px solid #f3d6a0" }}>
+                          <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 220, borderRight: "1px solid #f3d6a0" }}>Мероприятие</th>
+                          {data.squads?.map((s) => (
+                            <th key={s.id} style={{ padding: "14px 16px", minWidth: 120 }}>{s.name}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.events?.map((evt) => (
+                          <tr key={evt.id} style={{ borderBottom: "1px solid #f9ebd2" }}>
+                            <td style={{ padding: "14px 16px", textAlign: "left", fontWeight: 600, borderRight: "1px solid #f9ebd2" }}>{evt.name}</td>
+                            {data.squads?.map((squad) => {
+                              const placeRecord = evt.places.find((p) => p.squadId === squad.id);
+                              if (!placeRecord) return <td key={squad.id} style={{ padding: 14 }}>—</td>;
+                              if (placeRecord.place === 1) return <td key={squad.id} style={{ padding: 14, fontWeight: 700, color: "#c9920c" }}>🥇 1 место (3 б.)</td>;
+                              if (placeRecord.place === 2) return <td key={squad.id} style={{ padding: 14, fontWeight: 700, color: "#7a8b99" }}>🥈 2 место (2 б.)</td>;
+                              if (placeRecord.place === 3) return <td key={squad.id} style={{ padding: 14, fontWeight: 700, color: "#8d5b4c" }}>🥉 3 место (1 б.)</td>;
+                              return <td key={squad.id} style={{ padding: 14 }}>{placeRecord.place} место</td>;
+                            })}
+                          </tr>
+                        ))}
+                        {(!data.events || data.events.length === 0) && (
+                          <tr>
+                            <td colSpan={(data.squads?.length || 0) + 1} style={{ padding: 24, color: "var(--ink-muted)", fontStyle: "italic" }}>
+                              Мероприятия не проводились
+                            </td>
+                          </tr>
+                        )}
+                        {/* Total Points Row */}
+                        <tr style={{ background: "var(--bg-deep)", borderTop: "2px solid #f3d6a0", fontWeight: 800 }}>
+                          <td style={{ padding: "16px 16px", textAlign: "left", fontSize: 16, borderRight: "1px solid #f3d6a0" }}>Итого баллов</td>
+                          {data.squads?.map((s) => (
+                            <td key={s.id} style={{ padding: "16px 16px", fontSize: 16, color: "var(--accent-2)" }}>{getSquadPoints(s.id)}</td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Squads of the Day Section */}
+                  <div>
+                    <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--accent)", borderBottom: "2px solid var(--bg-deep)", paddingBottom: 8, marginBottom: 20 }}>
+                      ⭐ Отряды дня
+                    </h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+                      {shiftDates.map((date) => {
+                        const dateKey = date.toISOString().slice(0, 10);
+                        const activeSods = data.squadOfDays?.filter((sod) =>
+                          new Date(sod.date).toISOString().slice(0, 10) === dateKey
+                        ) || [];
+                        const formattedDate = date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+
+                        return (
+                          <div key={dateKey} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12, minHeight: 120 }}>
+                            <div style={{ fontWeight: 700, color: "var(--accent)", borderBottom: "1px solid #f9ebd2", paddingBottom: 6 }}>
+                              📅 {formattedDate}
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, justifyContent: "center" }}>
+                              {activeSods.length === 0 ? (
+                                <div style={{ color: "var(--ink-muted)", fontStyle: "italic", fontSize: 13 }}>Не назначен</div>
+                              ) : (
+                                activeSods.map((sod) => {
+                                  const sq = data.squads?.find((s) => s.id === sod.squadId);
+                                  if (!sq) return null;
+                                  return (
+                                    <div key={sod.squadId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                      <span style={{ fontWeight: 600, fontSize: 14 }}>{sq.name}</span>
+                                      <span style={{ fontSize: 16, color: "#ffc107" }}>{"⭐".repeat(sod.stars)}</span>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </>
             )}

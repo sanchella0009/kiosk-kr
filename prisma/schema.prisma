@@ -105,6 +105,7 @@ model Shift {
   endDate    DateTime
   counselors String?
   createdAt  DateTime @default(now())
+  squads     Squad[]
 }
 
 model TelegramAdmin {
@@ -182,5 +183,73 @@ model KioskAnalytics {
   kioskId   String
   ip        String?
   createdAt DateTime @default(now())
+}
+
+model Squad {
+  id          String       @id @default(cuid())
+  name        String
+  photoUrl    String?
+  shiftId     String
+  shift       Shift        @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+  children    Child[]
+  squadOfDays SquadOfDay[]
+  eventPlaces EventPlace[]
+}
+
+model Child {
+  id          String           @id @default(cuid())
+  name        String
+  squadId     String
+  squad       Squad            @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  isLeft      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  bestDays    BestChildOfDay[]
+}
+
+model BestChildOfDay {
+  id        String   @id @default(cuid())
+  childId   String
+  child     Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  date      DateTime // День смены
+  createdAt DateTime @default(now())
+
+  @@unique([childId, date])
+}
+
+model SquadOfDay {
+  id        String   @id @default(cuid())
+  squadId   String
+  squad     Squad    @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  date      DateTime // День смены
+  stars     Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@unique([squadId, date])
+}
+
+model Event {
+  id          String       @id @default(cuid())
+  name        String       // Название мероприятия
+  date        DateTime     @default(now())
+  createdAt   DateTime     @default(now())
+  places      EventPlace[]
+}
+
+model EventPlace {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  squadId   String
+  squad     Squad    @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  place     Int      // 1, 2, 3 или другое
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, squadId])
+}
+
+model CampSetting {
+  key   String @id
+  value String
 }
 
