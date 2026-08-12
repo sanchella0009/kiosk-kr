@@ -1,6 +1,8 @@
 import { Telegraf } from "telegraf";
 import crypto from "crypto";
 import path from "path";
+import fetch from "node-fetch";
+import { SocksProxyAgent } from "socks-proxy-agent";
 import { prisma } from "../src/lib/db";
 import { broadcastRefresh } from "../src/lib/broadcast";
 import { saveBuffer } from "../src/lib/media";
@@ -15,7 +17,14 @@ if (!token) {
   throw new Error("TELEGRAM_BOT_TOKEN is not set");
 }
 
-const bot = new Telegraf(token);
+const proxyUrl = process.env.TELEGRAM_SOCKS_PROXY;
+const agent = proxyUrl ? new SocksProxyAgent(proxyUrl) : undefined;
+
+const bot = new Telegraf(token, {
+  telegram: {
+    agent,
+  },
+});
 
 type PendingUpload = {
   category: "MENU" | "SCHEDULE";
@@ -91,9 +100,9 @@ const downloadTelegramFile = async (fileId: string) => {
   const file = await bot.telegram.getFile(fileId);
   if (!file.file_path) return null;
   const url = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-  const res = await fetch(url);
+  const res = await fetch(url, agent ? { agent } : undefined);
   if (!res.ok) return null;
-  const buffer = Buffer.from(await res.arrayBuffer());
+  const buffer = await res.buffer();
   return { buffer, filePath: file.file_path };
 };
 
