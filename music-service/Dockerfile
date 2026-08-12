@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DEFAULT_TIMEOUT=100
 
 COPY requirements.txt ./
-RUN pip install --progress-bar off -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+RUN pip install --progress-bar off -r requirements.txt
 
 COPY main.py ./
 
