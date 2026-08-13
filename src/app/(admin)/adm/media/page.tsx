@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { MediaUploadForm } from "@/components/admin/MediaUploadForm";
 import { MediaGallery } from "@/components/admin/MediaGallery";
 import { ConfirmButton } from "@/components/admin/ConfirmButton";
+import { VkSyncButton } from "@/components/admin/VkSyncButton";
 import { broadcastRefresh } from "@/lib/broadcast";
 import { deleteUploadIfLocal } from "@/lib/media";
 import Link from "next/link";
@@ -219,6 +220,7 @@ export default async function MediaAdminPage({
               Загрузите меню столовой на определённую дату. Оно отобразится во вкладке «Меню» на киоске.
             </p>
             <MediaUploadForm endpoint="/api/media/menu" mode="menu" />
+            <VkSyncButton />
           </div>
 
           <div className="admin-card">
