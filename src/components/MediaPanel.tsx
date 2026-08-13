@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PageFlip } from "page-flip";
 
 type MediaItem = {
@@ -22,11 +22,12 @@ export function MediaPanel({ items }: Props) {
     [items]
   );
   
-  const bookContainerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const sourceContainerRef = useRef<HTMLDivElement>(null);
   const pageFlipRef = useRef<any | null>(null);
+  
   const [index, setIndex] = useState(0);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   const goNext = () => {
@@ -41,10 +42,10 @@ export function MediaPanel({ items }: Props) {
     }
   };
 
-  // Monitor size of the parent element to resolve 0-size initialization issue
+  // Measure viewport container size via ResizeObserver
   useEffect(() => {
-    const htmlElement = bookContainerRef.current;
-    if (!htmlElement) return;
+    const el = viewportRef.current;
+    if (!el) return;
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -55,85 +56,100 @@ export function MediaPanel({ items }: Props) {
       }
     });
 
-    observer.observe(htmlElement);
-    return () => {
-      observer.disconnect();
-    };
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
-  // Initialize PageFlip with resolved size
-  useEffect(() => {
-    if (!bookContainerRef.current || activeItems.length === 0 || !size) return;
+  // Initialize PageFlip with cloned DOM nodes matching book1 Reader pattern
+  useLayoutEffect(() => {
+    if (!viewportRef.current || !sourceContainerRef.current || activeItems.length === 0 || !size) return;
+
+    // Clear previous contents of viewport
+    viewportRef.current.innerHTML = "";
+
+    // Create wrapper node
+    const bookWrapper = document.createElement("div");
+    bookWrapper.className = "flipbook-wrapper";
+    bookWrapper.style.width = `${size.width}px`;
+    bookWrapper.style.height = `${size.height}px`;
+    bookWrapper.style.position = "relative";
+    viewportRef.current.appendChild(bookWrapper);
+
+    // Query and clone source page elements
+    const domSources = sourceContainerRef.current.querySelectorAll(".book-page-element-source");
+    const clonedElements: HTMLDivElement[] = [];
+
+    domSources.forEach((el) => {
+      const clone = el.cloneNode(true) as HTMLDivElement;
+      clone.className = "book-page-element";
+      clone.style.width = `${size.width}px`;
+      clone.style.height = `${size.height}px`;
+      clone.style.display = "block";
+      bookWrapper.appendChild(clone);
+      clonedElements.push(clone);
+    });
 
     let flipBook: any = null;
-    const htmlElement = bookContainerRef.current;
 
-    const initBook = () => {
-      try {
-        flipBook = new PageFlip(htmlElement, {
-          width: size.width,
-          height: size.height,
-          size: "stretch",
-          minWidth: 100,
-          maxWidth: 2000,
-          minHeight: 100,
-          maxHeight: 2000,
-          drawShadow: true,
-          maxShadowOpacity: 0.3,
-          showCover: false,
-          mobileScrollSupport: false,
-          usePortrait: true,
-          clickEventForward: true, // Let buttons be clickable
+    try {
+      flipBook = new PageFlip(bookWrapper, {
+        width: size.width,
+        height: size.height,
+        size: "fixed",
+        minWidth: 100,
+        maxWidth: 2500,
+        minHeight: 100,
+        maxHeight: 2500,
+        drawShadow: true,
+        maxShadowOpacity: 0.4,
+        showCover: false,
+        usePortrait: true,
+        mobileScrollSupport: false,
+        clickEventForward: true,
+      });
+
+      if (clonedElements.length > 0) {
+        flipBook.loadFromHTML(clonedElements);
+        pageFlipRef.current = flipBook;
+
+        flipBook.on("flip", (e: any) => {
+          const nextIdx = e.data;
+          setIndex(nextIdx);
+
+          // Handle videos in active vs inactive pages
+          clonedElements.forEach((pageEl, pIdx) => {
+            const video = pageEl.querySelector("video");
+            if (video) {
+              if (pIdx === nextIdx) {
+                video.currentTime = 0;
+                video.play().catch(() => {});
+              } else {
+                video.pause();
+              }
+            }
+          });
         });
 
-        const domElements = htmlElement.querySelectorAll(".book-page-element");
-        if (domElements.length > 0) {
-          flipBook.loadFromHTML(domElements);
-          pageFlipRef.current = flipBook;
-          setIsInitialized(true);
-
-          flipBook.on("flip", (e: any) => {
-            const nextIdx = e.data;
-            setIndex(nextIdx);
-
-            // Handle video play/pause in raw DOM to avoid React reconciliation conflicts
-            const pages = htmlElement.querySelectorAll(".book-page-element");
-            pages.forEach((page: any, pIdx: number) => {
-              const video = page.querySelector("video");
-              if (video) {
-                if (pIdx === nextIdx) {
-                  video.currentTime = 0;
-                  video.play().catch(() => {});
-                } else {
-                  video.pause();
-                }
-              }
-            });
-          });
-
-          // Autoplay first page video if exists
-          const firstVideo = domElements[0]?.querySelector("video");
-          if (firstVideo) {
-            firstVideo.play().catch(() => {});
-          }
+        // Autoplay initial video if first page is a video
+        const firstVideo = clonedElements[0]?.querySelector("video");
+        if (firstVideo) {
+          firstVideo.play().catch(() => {});
         }
-      } catch (error) {
-        console.error("Failed to initialize PageFlip:", error);
       }
-    };
-
-    initBook();
+    } catch (error) {
+      console.error("Failed to initialize PageFlip in MediaPanel:", error);
+    }
 
     return () => {
       if (flipBook) {
         try {
           flipBook.destroy();
-        } catch (e) {
-          console.error("Failed to destroy PageFlip:", e);
-        }
+        } catch (e) {}
       }
       pageFlipRef.current = null;
-      setIsInitialized(false);
+      if (viewportRef.current) {
+        viewportRef.current.innerHTML = "";
+      }
     };
   }, [activeItems, size]);
 
@@ -158,7 +174,7 @@ export function MediaPanel({ items }: Props) {
         timerRef.current = null;
       }
     };
-  }, [activeItems, index, isInitialized]);
+  }, [activeItems, index]);
 
   if (activeItems.length === 0) {
     return (
@@ -208,23 +224,24 @@ export function MediaPanel({ items }: Props) {
         </>
       )}
 
-      {/* PageFlip Wrapper */}
+      {/* Viewport where cloned flipbook-wrapper is attached */}
       <div
-        ref={bookContainerRef}
+        ref={viewportRef}
         style={{
           width: "100%",
           height: "100%",
-          opacity: isInitialized ? 1 : 0,
-          transition: "opacity 0.3s ease",
+          position: "relative",
+          overflow: "hidden",
         }}
-      >
+      />
+
+      {/* Hidden React source pages for PageFlip cloning */}
+      <div ref={sourceContainerRef} style={{ display: "none" }}>
         {activeItems.map((item) => (
           <div
             key={item.id}
-            className="book-page-element"
+            className="book-page-element-source"
             style={{
-              width: "100%",
-              height: "100%",
               backgroundColor: "#000",
               overflow: "hidden",
               display: "flex",
