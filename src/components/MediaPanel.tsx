@@ -49,7 +49,8 @@ export function MediaPanel({ items }: Props) {
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const { width, height } = entry.contentRect;
+        const width = entry.contentRect.width;
+        const height = entry.contentRect.height;
         if (width > 0 && height > 0) {
           setSize({ width: Math.round(width), height: Math.round(height) });
         }
@@ -60,7 +61,7 @@ export function MediaPanel({ items }: Props) {
     return () => observer.disconnect();
   }, []);
 
-  // Initialize PageFlip with cloned DOM nodes matching book1 Reader pattern
+  // Initialize PageFlip with single-page layout (usePortrait: true, showCover: false)
   useLayoutEffect(() => {
     if (!viewportRef.current || !sourceContainerRef.current || activeItems.length === 0 || !size) return;
 
@@ -73,6 +74,8 @@ export function MediaPanel({ items }: Props) {
     bookWrapper.style.width = `${size.width}px`;
     bookWrapper.style.height = `${size.height}px`;
     bookWrapper.style.position = "relative";
+    bookWrapper.style.margin = "0 auto";
+    bookWrapper.style.overflow = "hidden";
     viewportRef.current.appendChild(bookWrapper);
 
     // Query and clone source page elements
@@ -101,9 +104,9 @@ export function MediaPanel({ items }: Props) {
         minHeight: 100,
         maxHeight: 2500,
         drawShadow: true,
-        maxShadowOpacity: 0.4,
-        showCover: false,
-        usePortrait: true,
+        maxShadowOpacity: 0.25, // Soft parchment shadows
+        showCover: false, 
+        usePortrait: true, 
         mobileScrollSupport: false,
         clickEventForward: true,
       });
@@ -112,15 +115,34 @@ export function MediaPanel({ items }: Props) {
         flipBook.loadFromHTML(clonedElements);
         pageFlipRef.current = flipBook;
 
+        // Start from page 1 (since index 0 is a duplicated boundary page)
+        if (activeItems.length > 1) {
+          flipBook.turnToPage(1);
+        }
+
         flipBook.on("flip", (e: any) => {
-          const nextIdx = e.data;
+          let virtualIdx = e.data;
+          const realCount = activeItems.length;
+
+          // Loop teleportation logic
+          if (activeItems.length > 1) {
+            if (virtualIdx === realCount + 1) {
+              flipBook.turnToPage(1);
+              virtualIdx = 1;
+            } else if (virtualIdx === 0) {
+              flipBook.turnToPage(realCount);
+              virtualIdx = realCount;
+            }
+          }
+
+          const nextIdx = activeItems.length > 1 ? virtualIdx - 1 : virtualIdx;
           setIndex(nextIdx);
 
           // Handle videos in active vs inactive pages
           clonedElements.forEach((pageEl, pIdx) => {
             const video = pageEl.querySelector("video");
             if (video) {
-              if (pIdx === nextIdx) {
+              if (pIdx === virtualIdx) {
                 video.currentTime = 0;
                 video.play().catch(() => {});
               } else {
@@ -131,7 +153,7 @@ export function MediaPanel({ items }: Props) {
         });
 
         // Autoplay initial video if first page is a video
-        const firstVideo = clonedElements[0]?.querySelector("video");
+        const firstVideo = clonedElements[activeItems.length > 1 ? 1 : 0]?.querySelector("video");
         if (firstVideo) {
           firstVideo.play().catch(() => {});
         }
@@ -176,6 +198,51 @@ export function MediaPanel({ items }: Props) {
     };
   }, [activeItems, index]);
 
+  const renderSourcePage = (item: MediaItem, key: string) => {
+    return (
+      <div
+        key={key}
+        className="book-page-element-source"
+        style={{
+          backgroundColor: "#f7efe0", // Restored original warm cream color
+          // Soft book crease page binding shadow
+          boxShadow: "inset 20px 0 30px -10px rgba(0, 0, 0, 0.15), inset -6px 0 12px -6px rgba(0, 0, 0, 0.1)",
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {item.type === "PHOTO" ? (
+          <img
+            src={item.url}
+            alt={item.title ?? "Медиа"}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              userSelect: "none",
+              pointerEvents: "none",
+            }}
+          />
+        ) : (
+          <video
+            src={item.url}
+            muted
+            playsInline
+            controls={false}
+            onEnded={() => activeItems.length > 1 && goNext()}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+            }}
+          />
+        )}
+      </div>
+    );
+  };
+
   if (activeItems.length === 0) {
     return (
       <div
@@ -194,7 +261,7 @@ export function MediaPanel({ items }: Props) {
         position: "relative",
         padding: 0,
         overflow: "hidden",
-        backgroundColor: "#000",
+        backgroundColor: "#f7efe0", // Restored original warm cream background
         display: "flex",
         alignItems: "stretch",
         justifyContent: "stretch",
@@ -224,7 +291,7 @@ export function MediaPanel({ items }: Props) {
         </>
       )}
 
-      {/* Viewport where cloned flipbook-wrapper is attached */}
+      {/* Viewport container */}
       <div
         ref={viewportRef}
         style={{
@@ -232,51 +299,24 @@ export function MediaPanel({ items }: Props) {
           height: "100%",
           position: "relative",
           overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       />
 
       {/* Hidden React source pages for PageFlip cloning */}
       <div ref={sourceContainerRef} style={{ display: "none" }}>
-        {activeItems.map((item) => (
-          <div
-            key={item.id}
-            className="book-page-element-source"
-            style={{
-              backgroundColor: "#000",
-              overflow: "hidden",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {item.type === "PHOTO" ? (
-              <img
-                src={item.url}
-                alt={item.title ?? "Медиа"}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                  userSelect: "none",
-                  pointerEvents: "none",
-                }}
-              />
-            ) : (
-              <video
-                src={item.url}
-                muted
-                playsInline
-                controls={false}
-                onEnded={() => activeItems.length > 1 && goNext()}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                }}
-              />
-            )}
-          </div>
-        ))}
+        {/* Prepend duplicate of last page for backward infinite looping */}
+        {activeItems.length > 1 &&
+          renderSourcePage(activeItems[activeItems.length - 1], "last-clone")}
+
+        {/* Real pages */}
+        {activeItems.map((item) => renderSourcePage(item, item.id))}
+
+        {/* Append duplicate of first page for forward infinite looping */}
+        {activeItems.length > 1 &&
+          renderSourcePage(activeItems[0], "first-clone")}
       </div>
     </div>
   );
