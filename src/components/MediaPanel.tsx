@@ -31,12 +31,14 @@ export function MediaPanel({ items }: Props) {
   const timerRef = useRef<number | null>(null);
 
   const goNext = () => {
+    console.log("[MediaPanel] goNext() called");
     if (pageFlipRef.current) {
       pageFlipRef.current.flipNext();
     }
   };
 
   const goPrev = () => {
+    console.log("[MediaPanel] goPrev() called");
     if (pageFlipRef.current) {
       pageFlipRef.current.flipPrev();
     }
@@ -88,6 +90,20 @@ export function MediaPanel({ items }: Props) {
       clone.style.width = `${size.width}px`;
       clone.style.height = `${size.height}px`;
       clone.style.display = "block";
+
+      // Since React's virtual event listeners are lost during DOM node cloning,
+      // we attach a native HTML5 "ended" event listener directly to the cloned video element.
+      const video = clone.querySelector("video");
+      if (video) {
+        console.log("[MediaPanel] Binding native ended listener to cloned video element");
+        video.addEventListener("ended", () => {
+          console.log("[MediaPanel] Cloned video ended, flipping to next slide");
+          if (activeItems.length > 1) {
+            goNext();
+          }
+        });
+      }
+
       bookWrapper.appendChild(clone);
       clonedElements.push(clone);
     });
@@ -104,7 +120,7 @@ export function MediaPanel({ items }: Props) {
         minHeight: 100,
         maxHeight: 2500,
         drawShadow: true,
-        maxShadowOpacity: 0.25, // Soft parchment shadows
+        maxShadowOpacity: 0.25,
         showCover: false, 
         usePortrait: true, 
         mobileScrollSupport: false,
@@ -177,21 +193,32 @@ export function MediaPanel({ items }: Props) {
 
   // Slideshow Timer logic
   useEffect(() => {
+    console.log("[Slideshow Timer] Triggered. Index:", index, "ActiveItems count:", activeItems.length);
     if (timerRef.current) {
+      console.log("[Slideshow Timer] Clearing active timer");
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
     if (activeItems.length <= 1) return;
 
     const item = activeItems[index];
-    if (!item || item.type === "VIDEO") return;
+    if (!item) return;
 
+    console.log("[Slideshow Timer] Current item type:", item.type, "url:", item.url);
+    if (item.type === "VIDEO") {
+      console.log("[Slideshow Timer] Current slide is video; timer suspended (ended listener will handle transition)");
+      return;
+    }
+
+    console.log("[Slideshow Timer] Current slide is photo; setting 30s timeout");
     timerRef.current = window.setTimeout(() => {
+      console.log("[Slideshow Timer] 30s timeout elapsed; calling goNext()");
       goNext();
     }, PHOTO_INTERVAL);
 
     return () => {
       if (timerRef.current) {
+        console.log("[Slideshow Timer] Cleanup: clearing timer");
         window.clearTimeout(timerRef.current);
         timerRef.current = null;
       }
@@ -204,8 +231,7 @@ export function MediaPanel({ items }: Props) {
         key={key}
         className="book-page-element-source"
         style={{
-          backgroundColor: "#f7efe0", // Restored original warm cream color
-          // Soft book crease page binding shadow
+          backgroundColor: "#f7efe0", 
           boxShadow: "inset 20px 0 30px -10px rgba(0, 0, 0, 0.15), inset -6px 0 12px -6px rgba(0, 0, 0, 0.1)",
           overflow: "hidden",
           display: "flex",
@@ -231,7 +257,6 @@ export function MediaPanel({ items }: Props) {
             muted
             playsInline
             controls={false}
-            onEnded={() => activeItems.length > 1 && goNext()}
             style={{
               width: "100%",
               height: "100%",
@@ -261,7 +286,7 @@ export function MediaPanel({ items }: Props) {
         position: "relative",
         padding: 0,
         overflow: "hidden",
-        backgroundColor: "#f7efe0", // Restored original warm cream background
+        backgroundColor: "#f7efe0", 
         display: "flex",
         alignItems: "stretch",
         justifyContent: "stretch",
