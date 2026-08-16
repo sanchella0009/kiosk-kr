@@ -1008,96 +1008,96 @@ export function KioskClient({ initialData }: Props) {
                       gap: 20,
                       marginTop: 20
                     }}>
-                            const squadOfDayCount = data.squadOfDays?.filter((sod) => sod.squadId === squad.id).length || 0;
+                      {data.squads?.map((squad) => {
+                        const squadOfDayCount = data.squadOfDays?.filter((sod) => sod.squadId === squad.id).length || 0;
 
-                            return (
-                              <div
-                                key={squad.id}
-                                onClick={() => {
-                                  setSelectedSquadId(squad.id);
-                                  setSquadDetailView(true);
-                                }}
-                                style={{
-                                  position: "relative",
-                                  height: 200,
-                                  borderRadius: 16,
-                                  overflow: "hidden",
-                                  cursor: "pointer",
-                                  boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
-                                  border: "2px solid #f3d6a0",
-                                  backgroundImage: squad.photoUrl ? `url(${squad.photoUrl})` : "linear-gradient(135deg, #fcecd6 0%, #f3d6a0 100%)",
-                                  backgroundSize: "cover",
-                                  backgroundPosition: "center",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  justifyContent: "space-between",
-                                  padding: 16,
-                                  transition: "transform 0.2s"
-                                }}
-                                className="squad-tile"
-                              >
-                                {squad.photoUrl && (
-                                  <div style={{
-                                    position: "absolute",
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    background: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.7) 100%)",
-                                    zIndex: 1
-                                  }} />
-                                )}
+                        return (
+                          <div
+                            key={squad.id}
+                            onClick={() => {
+                              setSelectedSquadId(squad.id);
+                              setSquadDetailView(true);
+                            }}
+                            style={{
+                              position: "relative",
+                              height: 200,
+                              borderRadius: 16,
+                              overflow: "hidden",
+                              cursor: "pointer",
+                              boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+                              border: "2px solid #f3d6a0",
+                              backgroundImage: squad.photoUrl ? `url(${squad.photoUrl})` : "linear-gradient(135deg, #fcecd6 0%, #f3d6a0 100%)",
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                              display: "flex",
+                              flexDirection: "column",
+                              justifyContent: "space-between",
+                              padding: 16,
+                              transition: "transform 0.2s"
+                            }}
+                            className="squad-tile"
+                          >
+                            {squad.photoUrl && (
+                              <div style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.7) 100%)",
+                                zIndex: 1
+                              }} />
+                            )}
 
-                                <div style={{
-                                  position: "relative",
-                                  zIndex: 2,
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "flex-start",
-                                  width: "100%"
-                                }}>
-                                  <h3 style={{
-                                    margin: 0,
-                                    color: squad.photoUrl ? "#fff" : "var(--ink)",
-                                    fontSize: 20,
-                                    fontWeight: 700,
-                                    textShadow: squad.photoUrl ? "1px 1px 3px rgba(0,0,0,0.8)" : "none",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-start",
-                                    gap: 4
-                                  }}>
-                                    <span>{squad.name}</span>
-                                    {squadOfDayCount > 0 && (
-                                      <span style={{ fontSize: 16, color: "#ffc107", textShadow: "none" }}>
-                                        {"⭐".repeat(squadOfDayCount)}
-                                      </span>
-                                    )}
-                                  </h3>
-                            <span style={{
-                              background: "var(--accent-2)",
-                              color: "#fff",
-                              padding: "4px 10px",
-                              borderRadius: 8,
-                              fontSize: 14,
-                              fontWeight: 800,
-                              boxShadow: "0 2px 6px rgba(0,0,0,0.15)"
+                            <div style={{
+                              position: "relative",
+                              zIndex: 2,
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              width: "100%"
                             }}>
-                              {getSquadPoints(squad.id)} б.
-                            </span>
+                              <h3 style={{
+                                margin: 0,
+                                color: squad.photoUrl ? "#fff" : "var(--ink)",
+                                fontSize: 20,
+                                fontWeight: 700,
+                                textShadow: squad.photoUrl ? "1px 1px 3px rgba(0,0,0,0.8)" : "none",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "flex-start",
+                                gap: 4
+                              }}>
+                                <span>{squad.name}</span>
+                                {squadOfDayCount > 0 && (
+                                  <span style={{ fontSize: 16, color: "#ffc107", textShadow: "none" }}>
+                                    {"⭐".repeat(squadOfDayCount)}
+                                  </span>
+                                )}
+                              </h3>
+                              <span style={{
+                                background: "var(--accent-2)",
+                                color: "#fff",
+                                padding: "4px 10px",
+                                borderRadius: 8,
+                                fontSize: 14,
+                                fontWeight: 800,
+                                boxShadow: "0 2px 6px rgba(0,0,0,0.15)"
+                              }}>
+                                {getSquadPoints(squad.id)} б.
+                              </span>
+                            </div>
+                            <div style={{
+                              position: "relative",
+                              zIndex: 2,
+                              color: squad.photoUrl ? "#eee" : "var(--ink-muted)",
+                              fontSize: 14,
+                              fontWeight: 600,
+                              textShadow: squad.photoUrl ? "1px 1px 2px rgba(0,0,0,0.8)" : "none"
+                            }}>
+                              Детей: {squad.children.length}
+                            </div>
                           </div>
-                          
-                          <div style={{
-                            position: "relative",
-                            zIndex: 2,
-                            color: squad.photoUrl ? "#eee" : "var(--ink-muted)",
-                            fontSize: 14,
-                            fontWeight: 600,
-                            textShadow: squad.photoUrl ? "1px 1px 2px rgba(0,0,0,0.8)" : "none"
-                          }}>
-                            Детей: {squad.children.length}
-                          </div>
-                        </div>
                       ))}
                     </div>
                   </>
