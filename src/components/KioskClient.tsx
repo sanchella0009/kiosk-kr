@@ -1098,7 +1098,7 @@ export function KioskClient({ initialData }: Props) {
                               Детей: {squad.children.length}
                             </div>
                           </div>
-                      ))}
+                      })}
                     </div>
                   </>
                 ) : (
