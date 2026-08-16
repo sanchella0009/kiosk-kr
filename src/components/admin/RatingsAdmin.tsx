@@ -297,31 +297,28 @@ export function RatingsAdmin({ shift, shifts, squads, events, squadOfDays }: Pro
                           sod.squadId === squad.id &&
                           new Date(sod.date).toISOString().slice(0, 10) === dateStr
                         );
-                        const currentStars = activeSquadOfDay?.stars || 0;
+                        const isSquadOfDay = !!activeSquadOfDay;
 
                         return (
                           <div key={squad.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                             <span style={{ fontWeight: 600, fontSize: 14 }}>{squad.name}</span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <button
-                                  key={star}
-                                  type="button"
-                                  style={{
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    fontSize: 20,
-                                    padding: 2,
-                                    lineHeight: 1,
-                                    filter: star <= currentStars ? "none" : "grayscale(100%) opacity(30%)"
-                                  }}
-                                  onClick={() => handleStarChange(squad.id, dateStr, star === currentStars ? 0 : star)}
-                                >
-                                  ⭐
-                                </button>
-                              ))}
-                            </div>
+                            <button
+                              type="button"
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: 22,
+                                padding: 2,
+                                lineHeight: 1,
+                                filter: isSquadOfDay ? "none" : "grayscale(100%) opacity(25%)",
+                                transition: "transform 0.1s"
+                              }}
+                              onClick={() => handleStarChange(squad.id, dateStr, isSquadOfDay ? 0 : 1)}
+                              title={isSquadOfDay ? "Снять отметку отряда дня" : "Отметить как отряд дня"}
+                            >
+                              ⭐
+                            </button>
                           </div>
                         );
                       })}
