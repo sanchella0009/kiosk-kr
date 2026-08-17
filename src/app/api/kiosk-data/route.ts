@@ -111,6 +111,19 @@ export async function GET() {
       })
     : [];
 
+  const penaltiesRewards = activeShift && squads.length > 0
+    ? await prisma.squadPenaltyReward.findMany({
+        where: {
+          squadId: {
+            in: squads.map((s) => s.id),
+          },
+        },
+        orderBy: {
+          date: "asc",
+        },
+      })
+    : [];
+
   return NextResponse.json({
     media,
     scheduleImages: scheduleImages.map((item) => ({
@@ -153,6 +166,14 @@ export async function GET() {
       squadId: sd.squadId,
       date: sd.date.toISOString(),
       stars: sd.stars,
+    })),
+    penaltiesRewards: penaltiesRewards.map((pr) => ({
+      id: pr.id,
+      squadId: pr.squadId,
+      type: pr.type,
+      points: pr.points,
+      reason: pr.reason,
+      date: pr.date.toISOString(),
     })),
     campLogo: campLogoSetting?.value || null,
     activeShift: activeShift

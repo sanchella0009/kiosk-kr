@@ -72,6 +72,14 @@ type KioskData = {
     date: string;
     stars: number;
   }[];
+  penaltiesRewards?: {
+    id: string;
+    squadId: string;
+    type: "PENALTY" | "REWARD";
+    points: number;
+    reason: string;
+    date: string;
+  }[];
   campLogo?: string | null;
   activeShift?: {
     id: string;
@@ -585,6 +593,15 @@ export function KioskClient({ initialData }: Props) {
         if (placeRecord.place === 1) total += 3;
         else if (placeRecord.place === 2) total += 2;
         else if (placeRecord.place === 3) total += 1;
+      }
+    });
+    data.penaltiesRewards?.forEach((pr) => {
+      if (pr.squadId === squadId) {
+        if (pr.type === "REWARD") {
+          total += pr.points;
+        } else if (pr.type === "PENALTY") {
+          total -= pr.points;
+        }
       }
     });
     return total;
@@ -1412,6 +1429,51 @@ export function KioskClient({ initialData }: Props) {
                         );
                       })}
                     </div>
+                  </div>
+
+                  {/* Penalties and Rewards Section */}
+                  <div>
+                    <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--accent)", borderBottom: "2px solid var(--bg-deep)", paddingBottom: 8, marginBottom: 20 }}>
+                      ⚖️ Штрафы и поощрения
+                    </h3>
+                    {(!data.penaltiesRewards || data.penaltiesRewards.length === 0) ? (
+                      <div style={{ fontStyle: "italic", color: "var(--ink-muted)", padding: 16, background: "#fff", borderRadius: 12, border: "1px solid #f3d6a0" }}>
+                        Штрафов и поощрений пока нет.
+                      </div>
+                    ) : (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+                        {data.penaltiesRewards.map((item) => {
+                          const sq = data.squads?.find((s) => s.id === item.squadId);
+                          if (!sq) return null;
+                          const formattedDate = new Date(item.date).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+                          const isReward = item.type === "REWARD";
+
+                          return (
+                            <div key={item.id} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, background: "#fff" }}>
+                              <div style={{ display: "flex", alignSelf: "stretch", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f9ebd2", paddingBottom: 6 }}>
+                                <span style={{ fontWeight: 700, color: "var(--accent)" }}>📅 {formattedDate}</span>
+                                <span
+                                  style={{
+                                    fontWeight: 700,
+                                    fontSize: 13,
+                                    color: isReward ? "#1f5f2c" : "#b1462b",
+                                    background: isReward ? "#cfe8d0" : "#fbdad2",
+                                    padding: "2px 8px",
+                                    borderRadius: 6,
+                                  }}
+                                >
+                                  {isReward ? `+${item.points} б.` : `-${item.points} б.`}
+                                </span>
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={{ fontWeight: 800, fontSize: 15 }}>{sq.name}</span>
+                                <span style={{ fontSize: 13, color: "var(--ink-main)" }}>{item.reason}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               </>

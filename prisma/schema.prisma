@@ -186,17 +186,18 @@ model KioskAnalytics {
 }
 
 model Squad {
-  id          String       @id @default(cuid())
-  name        String
-  photoUrl    String?
-  sortOrder   Int          @default(0)
-  shiftId     String
-  shift       Shift        @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  createdAt   DateTime     @default(now())
-  children    Child[]
-  squadOfDays SquadOfDay[]
-  eventPlaces EventPlace[]
-  photos      SquadPhoto[]
+  id               String               @id @default(cuid())
+  name             String
+  photoUrl         String?
+  sortOrder        Int                  @default(0)
+  shiftId          String
+  shift            Shift                @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  createdAt        DateTime             @default(now())
+  children         Child[]
+  squadOfDays      SquadOfDay[]
+  eventPlaces      EventPlace[]
+  photos           SquadPhoto[]
+  penaltiesRewards SquadPenaltyReward[]
 }
 
 model Child {
@@ -262,5 +263,21 @@ model EventPlace {
 model CampSetting {
   key   String @id
   value String
+}
+
+enum PenaltyRewardType {
+  PENALTY
+  REWARD
+}
+
+model SquadPenaltyReward {
+  id        String            @id @default(cuid())
+  squadId   String
+  squad     Squad             @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  type      PenaltyRewardType
+  points    Int
+  reason    String
+  date      DateTime
+  createdAt DateTime          @default(now())
 }
 

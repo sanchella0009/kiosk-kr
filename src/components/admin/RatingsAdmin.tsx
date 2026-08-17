@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   saveEventAction,
   deleteEventAction,
   setSquadOfDayAction,
   removeSquadOfDayAction,
+  saveSquadPenaltyRewardAction,
+  deleteSquadPenaltyRewardAction,
 } from "@/app/actions/squads";
 
 type Squad = {
@@ -40,15 +42,25 @@ type Shift = {
   endDate: Date;
 };
 
+type SquadPenaltyReward = {
+  id: string;
+  squadId: string;
+  type: "PENALTY" | "REWARD";
+  points: number;
+  reason: string;
+  date: Date;
+};
+
 type Props = {
   shift: Shift;
   shifts: Shift[];
   squads: Squad[];
   events: Event[];
   squadOfDays: SquadOfDay[];
+  penaltiesRewards: SquadPenaltyReward[];
 };
 
-export function RatingsAdmin({ shift, shifts, squads, events, squadOfDays }: Props) {
+export function RatingsAdmin({ shift, shifts, squads, events, squadOfDays, penaltiesRewards }: Props) {
   const router = useRouter();
 
   // Events editing state
@@ -74,6 +86,65 @@ export function RatingsAdmin({ shift, shifts, squads, events, squadOfDays }: Pro
   };
 
   const shiftDates = getDates();
+
+  // Penalties & Rewards state
+  const [penSquadId, setPenSquadId] = useState(squads[0]?.id || "");
+  const [penType, setPenType] = useState<"PENALTY" | "REWARD">("REWARD");
+  const [penPoints, setPenPoints] = useState(1);
+  const [penReason, setPenReason] = useState("");
+  const [penDate, setPenDate] = useState(shiftDates[0] || "");
+
+  // Sync state if selected shift/squads change
+  useEffect(() => {
+    if (squads.length > 0 && !squads.some((s) => s.id === penSquadId)) {
+      setPenSquadId(squads[0].id);
+    } else if (squads.length > 0 && !penSquadId) {
+      setPenSquadId(squads[0].id);
+    }
+    if (shiftDates.length > 0 && !shiftDates.includes(penDate)) {
+      setPenDate(shiftDates[0]);
+    } else if (shiftDates.length > 0 && !penDate) {
+      setPenDate(shiftDates[0]);
+    }
+  }, [shift.id, squads, shiftDates, penSquadId, penDate]);
+
+  const handleSavePenaltyReward = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetSquadId = penSquadId || squads[0]?.id;
+    const targetDate = penDate || shiftDates[0];
+    if (!targetSquadId) {
+      alert("Выберите отряд");
+      return;
+    }
+    if (!targetDate) {
+      alert("Выберите дату");
+      return;
+    }
+    if (!penReason.trim()) {
+      alert("Укажите причину");
+      return;
+    }
+
+    const res = await saveSquadPenaltyRewardAction(targetSquadId, penType, penPoints, penReason, targetDate);
+    if (res.success) {
+      setPenReason("");
+      setMessage(penType === "REWARD" ? "Поощрение успешно добавлено!" : "Штраф успешно добавлен!");
+      router.refresh();
+    } else {
+      alert(res.error);
+    }
+  };
+
+  const handleDeletePenaltyReward = async (id: string) => {
+    if (!confirm("Вы действительно хотите удалить эту запись?")) return;
+    const res = await deleteSquadPenaltyRewardAction(id);
+    if (res.success) {
+      setMessage("Запись удалена!");
+      router.refresh();
+    } else {
+      alert(res.error);
+    }
+  };
 
   const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -328,6 +399,184 @@ export function RatingsAdmin({ shift, shifts, squads, events, squadOfDays }: Pro
               })}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Penalties & Rewards Section */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.8fr", gap: 24, marginTop: 24, alignItems: "start" }}>
+        {/* Form Column */}
+        <div className="admin-card">
+          <h2>⚖️ Начислить штраф / поощрение</h2>
+          <form onSubmit={handleSavePenaltyReward} className="review-form" style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
+            <div>
+              <label style={{ fontSize: 14, fontWeight: 700 }}>Отряд:</label>
+              <select
+                className="input"
+                style={{ marginTop: 4, width: "100%" }}
+                value={penSquadId}
+                onChange={(e) => setPenSquadId(e.target.value)}
+                required
+              >
+                {squads.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+                {squads.length === 0 && <option value="">Отряды не созданы</option>}
+              </select>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 14, fontWeight: 700 }}>Тип действия:</label>
+                <select
+                  className="input"
+                  style={{ marginTop: 4, width: "100%" }}
+                  value={penType}
+                  onChange={(e) => setPenType(e.target.value as "PENALTY" | "REWARD")}
+                  required
+                >
+                  <option value="REWARD">Поощрение (+)</option>
+                  <option value="PENALTY">Штраф (-)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 14, fontWeight: 700 }}>Количество баллов:</label>
+                <select
+                  className="input"
+                  style={{ marginTop: 4, width: "100%" }}
+                  value={penPoints}
+                  onChange={(e) => setPenPoints(Number(e.target.value))}
+                  required
+                >
+                  {[1, 2, 3, 4, 5].map((pts) => (
+                    <option key={pts} value={pts}>
+                      {pts} {pts === 1 ? "балл" : pts < 5 ? "балла" : "баллов"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 14, fontWeight: 700 }}>Дата:</label>
+                <select
+                  className="input"
+                  style={{ marginTop: 4, width: "100%" }}
+                  value={penDate}
+                  onChange={(e) => setPenDate(e.target.value)}
+                  required
+                >
+                  {shiftDates.map((dateStr) => {
+                    const formattedDate = dateStr.split("-").reverse().slice(0, 2).join(".");
+                    return (
+                      <option key={dateStr} value={dateStr}>
+                        📅 {formattedDate}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 14, fontWeight: 700 }}>Причина / Описание:</label>
+              <input
+                className="input"
+                placeholder="Например: За образцовый порядок в палате"
+                value={penReason}
+                onChange={(e) => setPenReason(e.target.value)}
+                required
+                style={{ marginTop: 4 }}
+              />
+            </div>
+
+            <div style={{ marginTop: 6 }}>
+              <button className="btn-primary" type="submit" disabled={squads.length === 0}>
+                Начислить
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* List Column */}
+        <div className="admin-card">
+          <h2>📜 История штрафов и поощрений ({penaltiesRewards.length})</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+            {penaltiesRewards.length === 0 ? (
+              <div style={{ fontStyle: "italic", color: "var(--ink-muted)", padding: 8 }}>
+                Штрафы и поощрения пока не начислялись.
+              </div>
+            ) : (
+              penaltiesRewards.map((item) => {
+                const sq = squads.find((s) => s.id === item.squadId);
+                if (!sq) return null;
+                const formattedDate = new Date(item.date).toLocaleDateString("ru-RU", {
+                  day: "2-digit",
+                  month: "2-digit",
+                });
+                const isReward = item.type === "REWARD";
+
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      padding: 12,
+                      border: "1px solid #f3d6a0",
+                      borderRadius: 10,
+                      background: "#fff",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: "var(--accent)" }}>
+                          📅 {formattedDate}
+                        </span>
+                        <span style={{ fontWeight: 600, fontSize: 15, background: "var(--bg-deep)", padding: "2px 8px", borderRadius: 6 }}>
+                          {sq.name}
+                        </span>
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            fontSize: 13,
+                            color: isReward ? "#1f5f2c" : "#b1462b",
+                            background: isReward ? "#cfe8d0" : "#fbdad2",
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                          }}
+                        >
+                          {isReward ? `+${item.points} б.` : `-${item.points} б.`}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 14, color: "var(--ink-main)", marginTop: 2 }}>
+                        {item.reason}
+                      </div>
+                    </div>
+                    <div>
+                      <button
+                        className="btn-ghost"
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: 12,
+                          borderColor: "#b1462b",
+                          color: "#b1462b",
+                        }}
+                        onClick={() => handleDeletePenaltyReward(item.id)}
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
 

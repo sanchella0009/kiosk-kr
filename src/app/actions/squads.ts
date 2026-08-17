@@ -358,14 +358,33 @@ export async function toggleChildCommanderAction(childId: string, isCommander: b
 export async function addSquadPhotoAction(squadId: string, url: string) {
   await requireAuth();
   try {
+    const squad = await prisma.squad.findUnique({
+      where: { id: squadId },
+      select: { name: true },
+    });
+    const title = squad ? `Будни: ${squad.name}` : "Фото отряда";
+
     const photo = await prisma.squadPhoto.create({
       data: {
         squadId,
         url,
       },
     });
+
+    // Automatically add to main slides gallery
+    await prisma.media.create({
+      data: {
+        type: "PHOTO",
+        category: "MAIN",
+        url,
+        title,
+      },
+    });
+
     await broadcastRefresh();
     revalidatePath("/adm/squads");
+    revalidatePath("/");
+    revalidatePath("/adm/media");
     return { success: true, photo };
   } catch (error: any) {
     return { success: false, error: error.message || "Ошибка при добавлении фото в галерею" };
@@ -383,11 +402,64 @@ export async function deleteSquadPhotoAction(photoId: string) {
       await prisma.squadPhoto.delete({
         where: { id: photoId },
       });
+      // Also delete from main media gallery to avoid broken links
+      await prisma.media.deleteMany({
+        where: { url: photo.url, category: "MAIN" },
+      });
     }
     await broadcastRefresh();
     revalidatePath("/adm/squads");
+    revalidatePath("/");
+    revalidatePath("/adm/media");
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message || "Ошибка при удалении фото из галереи" };
   }
 }
+
+export async function saveSquadPenaltyRewardAction(
+  squadId: string,
+  type: "PENALTY" | "REWARD",
+  points: number,
+  reason: string,
+  dateStr: string
+) {
+  await requireAuth();
+  if (!reason.trim()) return { success: false, error: "Причина не может быть пустой" };
+  if (points <= 0) return { success: false, error: "Количество баллов должно быть больше нуля" };
+
+  try {
+    const date = new Date(dateStr);
+    await prisma.squadPenaltyReward.create({
+      data: {
+        squadId,
+        type,
+        points,
+        reason: reason.trim(),
+        date,
+      },
+    });
+
+    await broadcastRefresh();
+    revalidatePath("/adm/ratings");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Ошибка при сохранении" };
+  }
+}
+
+export async function deleteSquadPenaltyRewardAction(id: string) {
+  await requireAuth();
+  try {
+    await prisma.squadPenaltyReward.delete({
+      where: { id },
+    });
+
+    await broadcastRefresh();
+    revalidatePath("/adm/ratings");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Ошибка при удалении" };
+  }
+}
+

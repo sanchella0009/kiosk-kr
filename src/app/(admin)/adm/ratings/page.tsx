@@ -72,12 +72,24 @@ export default async function RatingsAdminPage({
     },
   });
 
+  // Fetch penalties and rewards for this shift's squads
+  const penaltiesRewards = await prisma.squadPenaltyReward.findMany({
+    where: {
+      squadId: {
+        in: squads.map((s) => s.id),
+      },
+    },
+    orderBy: {
+      date: "desc",
+    },
+  });
+
   return (
     <div className="list" style={{ gap: 20 }}>
       <div className="admin-card">
         <h1>🏆 Управление рейтингом отрядов</h1>
         <p style={{ color: "var(--ink-muted)", marginTop: 4 }}>
-          Создавайте общелагерные мероприятия, распределяйте места среди отрядов и отмечайте отряды дня с присвоением звезд.
+          Создавайте общелагерные мероприятия, распределяйте места среди отрядов, отмечайте отряды дня с присвоением звезд и управляйте системой штрафов/поощрений.
         </p>
       </div>
 
@@ -87,7 +99,9 @@ export default async function RatingsAdminPage({
         squads={squads}
         events={events}
         squadOfDays={squadOfDays}
+        penaltiesRewards={penaltiesRewards}
       />
     </div>
   );
 }
+

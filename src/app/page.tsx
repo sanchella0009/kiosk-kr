@@ -95,6 +95,19 @@ export default async function KioskPage() {
       })
     : [];
 
+  const penaltiesRewards = activeShift && squads.length > 0
+    ? await prisma.squadPenaltyReward.findMany({
+        where: {
+          squadId: {
+            in: squads.map((s) => s.id),
+          },
+        },
+        orderBy: {
+          date: "asc",
+        },
+      })
+    : [];
+
   return (
     <>
       <KioskInteractionMode />
@@ -141,6 +154,14 @@ export default async function KioskPage() {
             squadId: sd.squadId,
             date: sd.date.toISOString(),
             stars: sd.stars,
+          })),
+          penaltiesRewards: penaltiesRewards.map((pr) => ({
+            id: pr.id,
+            squadId: pr.squadId,
+            type: pr.type,
+            points: pr.points,
+            reason: pr.reason,
+            date: pr.date.toISOString(),
           })),
           campLogo: campLogoSetting?.value || null,
           activeShift: activeShift
