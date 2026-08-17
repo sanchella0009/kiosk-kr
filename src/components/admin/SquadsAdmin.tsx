@@ -12,12 +12,16 @@ import {
   setBestChildOfDayAction,
   saveCampLogoAction,
   updateSquadsOrderAction,
+  toggleChildCommanderAction,
+  addSquadPhotoAction,
+  deleteSquadPhotoAction,
 } from "@/app/actions/squads";
 
 type Child = {
   id: string;
   name: string;
   isLeft: boolean;
+  isCommander: boolean;
   bestDays: { id: string; date: Date }[];
 };
 
@@ -25,6 +29,7 @@ type Squad = {
   id: string;
   name: string;
   photoUrl: string | null;
+  photos: { id: string; url: string }[];
   children: Child[];
 };
 
@@ -271,6 +276,78 @@ export function SquadsAdmin({ shift, shifts, initialSquads, initialLogoUrl }: Pr
       router.refresh();
     } else {
       alert(res.error);
+    }
+  };
+
+  const handleToggleCommander = async (childId: string, currentIsCommander: boolean) => {
+    const nextVal = !currentIsCommander;
+    
+    // Optimistic UI update
+    setSquads(prevSquads => prevSquads.map(s => {
+      return {
+        ...s,
+        children: s.children.map(c => {
+          if (c.id === childId) {
+            return { ...c, isCommander: nextVal };
+          }
+          return c;
+        })
+      };
+    }));
+
+    const res = await toggleChildCommanderAction(childId, nextVal);
+    if (!res.success) {
+      alert("Ошибка при изменении статуса командира: " + res.error);
+      router.refresh();
+    } else {
+      router.refresh();
+    }
+  };
+
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+
+  const handleSquadPhotoGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedSquadId) return;
+
+    setUploadingGallery(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/editor/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      if (data.url) {
+        const actionRes = await addSquadPhotoAction(selectedSquadId, data.url);
+        if (actionRes.success) {
+          setMessage("Фото добавлено в галерею отряда!");
+          setTimeout(() => setMessage(null), 3000);
+          router.refresh();
+        } else {
+          alert("Ошибка при сохранении фото в БД: " + actionRes.error);
+        }
+      }
+    } catch {
+      alert("Ошибка при загрузке фото");
+    } finally {
+      setUploadingGallery(false);
+    }
+  };
+
+  const handleDeleteSquadPhoto = async (photoId: string) => {
+    if (!confirm("Вы действительно хотите удалить это фото из галереи?")) return;
+
+    const res = await deleteSquadPhotoAction(photoId);
+    if (res.success) {
+      setMessage("Фото удалено из галереи!");
+      setTimeout(() => setMessage(null), 3000);
+      router.refresh();
+    } else {
+      alert("Ошибка при удалении фото: " + res.error);
     }
   };
 
@@ -525,6 +602,7 @@ export function SquadsAdmin({ shift, shifts, initialSquads, initialLogoUrl }: Pr
                     <thead>
                       <tr style={{ borderBottom: "2px solid #f3d6a0", textAlign: "left" }}>
                         <th style={{ padding: "8px 12px" }}>Имя</th>
+                        <th style={{ padding: "8px 12px", width: 120 }}>Командир</th>
                         <th style={{ padding: "8px 12px", width: 120 }}>Выбыл</th>
                         <th style={{ padding: "8px 12px", width: 100, textAlign: "right" }}>Действия</th>
                       </tr>
@@ -532,14 +610,25 @@ export function SquadsAdmin({ shift, shifts, initialSquads, initialLogoUrl }: Pr
                     <tbody>
                       {selectedSquad.children.length === 0 ? (
                         <tr>
-                          <td colSpan={3} style={{ padding: 16, textAlign: "center", color: "var(--ink-muted)", fontStyle: "italic" }}>
+                          <td colSpan={4} style={{ padding: 16, textAlign: "center", color: "var(--ink-muted)", fontStyle: "italic" }}>
                             В этом отряде пока нет детей.
                           </td>
                         </tr>
                       ) : (
                         selectedSquad.children.map((child) => (
                           <tr key={child.id} style={{ borderBottom: "1px solid #f3d6a0", opacity: child.isLeft ? 0.5 : 1 }}>
-                            <td style={{ padding: "8px 12px", textDecoration: child.isLeft ? "line-through" : "none" }}>{child.name}</td>
+                            <td style={{ padding: "8px 12px", textDecoration: child.isLeft ? "line-through" : "none" }}>
+                              {child.name} {child.isCommander && <span style={{ fontSize: 11, color: "#1f5f2c", fontWeight: 700, marginLeft: 6, padding: "2px 6px", background: "#cfe8d0", borderRadius: 4 }}>👑 Командир</span>}
+                            </td>
+                            <td style={{ padding: "8px 12px" }}>
+                              <input
+                                type="checkbox"
+                                checked={child.isCommander}
+                                onChange={() => handleToggleCommander(child.id, child.isCommander)}
+                                style={{ width: 18, height: 18, cursor: "pointer" }}
+                                disabled={child.isLeft}
+                              />
+                            </td>
                             <td style={{ padding: "8px 12px" }}>
                               <input
                                 type="checkbox"
@@ -602,6 +691,92 @@ export function SquadsAdmin({ shift, shifts, initialSquads, initialLogoUrl }: Pr
                       </div>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Squad Photo Gallery */}
+              <div className="admin-card">
+                <h2>📸 Галерея отряда (дополнительные фото)</h2>
+                <p style={{ color: "var(--ink-muted)", fontSize: 13, marginTop: 4 }}>
+                  Загрузите дополнительные фотографии отряда. Они будут показываться на главном экране в виде листалки.
+                </p>
+
+                {/* Upload Trigger */}
+                <div style={{ marginTop: 16 }}>
+                  <label className="btn" style={{ 
+                    display: "inline-flex", 
+                    alignItems: "center", 
+                    gap: 8, 
+                    backgroundColor: "var(--accent-2, #3e6344)", 
+                    color: "#fff", 
+                    padding: "10px 16px", 
+                    borderRadius: 6, 
+                    cursor: uploadingGallery ? "not-allowed" : "pointer",
+                    fontSize: 13,
+                    fontWeight: 600
+                  }}>
+                    {uploadingGallery ? "⏳ Загрузка..." : "➕ Добавить фото в галерею"}
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      style={{ display: "none" }} 
+                      onChange={handleSquadPhotoGalleryUpload} 
+                      disabled={uploadingGallery} 
+                    />
+                  </label>
+                </div>
+
+                {/* Gallery Grid */}
+                <div style={{ 
+                  display: "grid", 
+                  gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", 
+                  gap: 16, 
+                  marginTop: 20 
+                }}>
+                  {(!selectedSquad.photos || selectedSquad.photos.length === 0) ? (
+                    <div style={{ gridColumn: "1 / -1", fontStyle: "italic", color: "var(--ink-muted)", padding: 12 }}>
+                      Галерея пока пуста. Загрузите первые фотографии!
+                    </div>
+                  ) : (
+                    selectedSquad.photos.map((photo) => (
+                      <div 
+                        key={photo.id} 
+                        style={{ 
+                          position: "relative", 
+                          height: 120, 
+                          borderRadius: 8, 
+                          overflow: "hidden", 
+                          border: "1px solid #f3d6a0"
+                        }}
+                      >
+                        <img 
+                          src={photo.url} 
+                          alt="Фото" 
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSquadPhoto(photo.id)}
+                          style={{
+                            position: "absolute",
+                            top: 4,
+                            right: 4,
+                            backgroundColor: "rgba(177, 70, 43, 0.9)",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 4,
+                            padding: "4px 8px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            boxShadow: "0 1px 4px rgba(0,0,0,0.3)"
+                          }}
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </>

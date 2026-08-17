@@ -196,6 +196,7 @@ model Squad {
   children    Child[]
   squadOfDays SquadOfDay[]
   eventPlaces EventPlace[]
+  photos      SquadPhoto[]
 }
 
 model Child {
@@ -204,6 +205,7 @@ model Child {
   squadId     String
   squad       Squad            @relation(fields: [squadId], references: [id], onDelete: Cascade)
   isLeft      Boolean          @default(false)
+  isCommander Boolean          @default(false)
   createdAt   DateTime         @default(now())
   bestDays    BestChildOfDay[]
 }
@@ -227,6 +229,14 @@ model SquadOfDay {
   createdAt DateTime @default(now())
 
   @@unique([squadId, date])
+}
+
+model SquadPhoto {
+  id        String   @id @default(cuid())
+  squadId   String
+  squad     Squad    @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  url       String
+  createdAt DateTime @default(now())
 }
 
 model Event {

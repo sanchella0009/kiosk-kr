@@ -53,10 +53,12 @@ type KioskData = {
     id: string;
     name: string;
     photoUrl: string | null;
+    photos?: string[];
     children: {
       id: string;
       name: string;
       isLeft: boolean;
+      isCommander?: boolean;
       bestDays: { date: string }[];
     }[];
   }[];
@@ -103,6 +105,12 @@ export function KioskClient({ initialData }: Props) {
     return null;
   });
   const [squadDetailView, setSquadDetailView] = useState(false);
+  const [squadPhotoIdx, setSquadPhotoIdx] = useState(0);
+
+  useEffect(() => {
+    setSquadPhotoIdx(0);
+  }, [selectedSquadId]);
+
   const [scheduleKey, setScheduleKey] = useState<string | null>(null);
   const [menuKey, setMenuKey] = useState<string | null>(null);
   const [showEarlierSchedule, setShowEarlierSchedule] = useState(false);
@@ -1130,15 +1138,110 @@ export function KioskClient({ initialData }: Props) {
                           borderRadius: 16,
                           border: "3px solid #f3d6a0"
                         }}>
-                          {selectedSquad.photoUrl ? (
-                            <img
-                              src={selectedSquad.photoUrl}
-                              alt={selectedSquad.name}
-                              style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                            />
-                          ) : (
-                            <div style={{ color: "#fff", fontStyle: "italic" }}>Фото отряда не загружено</div>
-                          )}
+                          {(() => {
+                            const squadPhotos = [
+                              ...(selectedSquad.photoUrl ? [selectedSquad.photoUrl] : []),
+                              ...(selectedSquad.photos || [])
+                            ];
+
+                            if (squadPhotos.length === 0) {
+                              return <div style={{ color: "#fff", fontStyle: "italic" }}>Фото отряда не загружены</div>;
+                            }
+
+                            const currentPhoto = squadPhotos[squadPhotoIdx] || squadPhotos[0];
+
+                            return (
+                              <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <img
+                                  src={currentPhoto}
+                                  alt={selectedSquad.name}
+                                  style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                                />
+
+                                {/* Carousel Navigation Overlay */}
+                                {squadPhotos.length > 1 && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSquadPhotoIdx((prev) => (prev === 0 ? squadPhotos.length - 1 : prev - 1));
+                                      }}
+                                      style={{
+                                        position: "absolute",
+                                        left: 16,
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: "50%",
+                                        background: "rgba(0,0,0,0.6)",
+                                        color: "#fff",
+                                        border: "none",
+                                        fontSize: 20,
+                                        fontWeight: "bold",
+                                        cursor: "pointer",
+                                        display: "grid",
+                                        placeItems: "center",
+                                        zIndex: 10
+                                      }}
+                                    >
+                                      ←
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSquadPhotoIdx((prev) => (prev === squadPhotos.length - 1 ? 0 : prev + 1));
+                                      }}
+                                      style={{
+                                        position: "absolute",
+                                        right: 16,
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: "50%",
+                                        background: "rgba(0,0,0,0.6)",
+                                        color: "#fff",
+                                        border: "none",
+                                        fontSize: 20,
+                                        fontWeight: "bold",
+                                        cursor: "pointer",
+                                        display: "grid",
+                                        placeItems: "center",
+                                        zIndex: 10
+                                      }}
+                                    >
+                                      →
+                                    </button>
+
+                                    {/* Slide indicator dots */}
+                                    <div style={{
+                                      position: "absolute",
+                                      bottom: 16,
+                                      left: "50%",
+                                      transform: "translateX(-50%)",
+                                      display: "flex",
+                                      gap: 8,
+                                      background: "rgba(0,0,0,0.5)",
+                                      padding: "6px 12px",
+                                      borderRadius: 12,
+                                      zIndex: 10
+                                    }}>
+                                      {squadPhotos.map((_, pIdx) => (
+                                        <div
+                                          key={pIdx}
+                                          style={{
+                                            width: 8,
+                                            height: 8,
+                                            borderRadius: "50%",
+                                            background: pIdx === squadPhotoIdx ? "#fff" : "rgba(255,255,255,0.4)"
+                                          }}
+                                        />
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         <div style={{ overflowX: "auto", border: "1px solid #f3d6a0", borderRadius: 12, background: "#fff" }}>
@@ -1166,7 +1269,23 @@ export function KioskClient({ initialData }: Props) {
                                     borderRight: "1px solid #f3d6a0",
                                     textDecoration: child.isLeft ? "line-through" : "none"
                                   }}>
-                                    {child.name} {child.isLeft && <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 400 }}>(выбыл)</span>}
+                                    {child.name}{" "}
+                                    {child.isCommander && (
+                                      <span style={{ 
+                                        fontSize: 11, 
+                                        color: "#1f5f2c", 
+                                        fontWeight: 700, 
+                                        marginLeft: 8, 
+                                        padding: "2px 6px", 
+                                        background: "#cfe8d0", 
+                                        borderRadius: 4,
+                                        display: "inline-block",
+                                        verticalAlign: "middle"
+                                      }}>
+                                        👑 Командир
+                                      </span>
+                                    )}
+                                    {child.isLeft && <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 400 }}>(выбыл)</span>}
                                   </td>
                                   {shiftDates.map((date) => {
                                     const dateKey = date.toISOString().slice(0, 10);

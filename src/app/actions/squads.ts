@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { broadcastRefresh } from "@/lib/broadcast";
 import { getSessionUser } from "@/lib/auth";
+import { deleteUploadIfLocal } from "@/lib/media";
 
 async function requireAuth() {
   const user = await getSessionUser();
@@ -336,5 +337,57 @@ export async function updateSquadsOrderAction(squadIds: string[]) {
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message || "Ошибка при изменении порядка" };
+  }
+}
+
+export async function toggleChildCommanderAction(childId: string, isCommander: boolean) {
+  await requireAuth();
+  try {
+    await prisma.child.update({
+      where: { id: childId },
+      data: { isCommander },
+    });
+    await broadcastRefresh();
+    revalidatePath("/adm/squads");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Ошибка при изменении статуса командира" };
+  }
+}
+
+export async function addSquadPhotoAction(squadId: string, url: string) {
+  await requireAuth();
+  try {
+    const photo = await prisma.squadPhoto.create({
+      data: {
+        squadId,
+        url,
+      },
+    });
+    await broadcastRefresh();
+    revalidatePath("/adm/squads");
+    return { success: true, photo };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Ошибка при добавлении фото в галерею" };
+  }
+}
+
+export async function deleteSquadPhotoAction(photoId: string) {
+  await requireAuth();
+  try {
+    const photo = await prisma.squadPhoto.findUnique({
+      where: { id: photoId },
+    });
+    if (photo) {
+      await deleteUploadIfLocal(photo.url);
+      await prisma.squadPhoto.delete({
+        where: { id: photoId },
+      });
+    }
+    await broadcastRefresh();
+    revalidatePath("/adm/squads");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Ошибка при удалении фото из галереи" };
   }
 }

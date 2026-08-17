@@ -52,6 +52,7 @@ export default async function SquadsAdminPage({
         },
         orderBy: { name: "asc" },
       },
+      photos: true,
     },
     orderBy: { sortOrder: "asc" },
   });

@@ -59,6 +59,7 @@ export default async function KioskPage() {
                 },
                 orderBy: { name: "asc" },
               },
+              photos: true,
             },
             orderBy: { sortOrder: "asc" },
           })
@@ -117,10 +118,12 @@ export default async function KioskPage() {
             id: s.id,
             name: s.name,
             photoUrl: s.photoUrl,
+            photos: s.photos.map((p) => p.url),
             children: s.children.map((c) => ({
               id: c.id,
               name: c.name,
               isLeft: c.isLeft,
+              isCommander: c.isCommander,
               bestDays: c.bestDays.map((b) => ({
                 date: b.date.toISOString(),
               })),
