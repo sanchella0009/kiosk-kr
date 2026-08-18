@@ -75,12 +75,13 @@ export function RatingsAdmin({ shift, shifts, squads, events, squadOfDays, penal
     const dates: string[] = [];
     const current = new Date(shift.startDate);
     const end = new Date(shift.endDate);
-    current.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
 
     while (current <= end) {
-      dates.push(current.toISOString().slice(0, 10));
-      current.setDate(current.getDate() + 1);
+      const year = current.getUTCFullYear();
+      const month = String(current.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(current.getUTCDate()).padStart(2, "0");
+      dates.push(`${year}-${month}-${day}`);
+      current.setUTCDate(current.getUTCDate() + 1);
     }
     return dates;
   };
@@ -364,10 +365,11 @@ export function RatingsAdmin({ shift, shifts, squads, events, squadOfDays, penal
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {squads.map((squad) => {
-                        const activeSquadOfDay = squadOfDays.find((sod) =>
-                          sod.squadId === squad.id &&
-                          new Date(sod.date).toISOString().slice(0, 10) === dateStr
-                        );
+                        const activeSquadOfDay = squadOfDays.find((sod) => {
+                          const sodDate = typeof sod.date === "string" ? new Date(sod.date) : sod.date;
+                          const sodDateStr = sodDate.toISOString().slice(0, 10);
+                          return sod.squadId === squad.id && sodDateStr === dateStr;
+                        });
                         const isSquadOfDay = !!activeSquadOfDay;
 
                         return (
@@ -513,10 +515,10 @@ export function RatingsAdmin({ shift, shifts, squads, events, squadOfDays, penal
               penaltiesRewards.map((item) => {
                 const sq = squads.find((s) => s.id === item.squadId);
                 if (!sq) return null;
-                const formattedDate = new Date(item.date).toLocaleDateString("ru-RU", {
-                  day: "2-digit",
-                  month: "2-digit",
-                });
+                const dateObj = typeof item.date === "string" ? new Date(item.date) : item.date;
+                const day = String(dateObj.getUTCDate()).padStart(2, "0");
+                const month = String(dateObj.getUTCMonth() + 1).padStart(2, "0");
+                const formattedDate = `${day}.${month}`;
                 const isReward = item.type === "REWARD";
 
                 return (

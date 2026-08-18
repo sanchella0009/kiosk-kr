@@ -391,6 +391,46 @@ export async function addSquadPhotoAction(squadId: string, url: string) {
   }
 }
 
+export async function addSquadPhotosAction(squadId: string, urls: string[]) {
+  await requireAuth();
+  if (urls.length === 0) return { success: true };
+
+  try {
+    const squad = await prisma.squad.findUnique({
+      where: { id: squadId },
+      select: { name: true },
+    });
+    const title = squad ? `Будни: ${squad.name}` : "Фото отряда";
+
+    await prisma.$transaction(async (tx) => {
+      for (const url of urls) {
+        await tx.squadPhoto.create({
+          data: {
+            squadId,
+            url,
+          },
+        });
+        await tx.media.create({
+          data: {
+            type: "PHOTO",
+            category: "MAIN",
+            url,
+            title,
+          },
+        });
+      }
+    });
+
+    await broadcastRefresh();
+    revalidatePath("/adm/squads");
+    revalidatePath("/");
+    revalidatePath("/adm/media");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Ошибка при добавлении фото в галерею" };
+  }
+}
+
 export async function deleteSquadPhotoAction(photoId: string) {
   await requireAuth();
   try {

@@ -568,22 +568,26 @@ export function KioskClient({ initialData }: Props) {
 
   const getShiftDates = () => {
     if (!data.activeShift) return [];
-    const dates: Date[] = [];
+    const dates: string[] = [];
     const current = new Date(data.activeShift.startDate);
     const end = new Date(data.activeShift.endDate);
-    current.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
 
     while (current <= end) {
-      dates.push(new Date(current));
-      current.setDate(current.getDate() + 1);
+      const year = current.getUTCFullYear();
+      const month = String(current.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(current.getUTCDate()).padStart(2, "0");
+      dates.push(`${year}-${month}-${day}`);
+      current.setUTCDate(current.getUTCDate() + 1);
     }
     return dates;
   };
 
   const shiftDates = getShiftDates();
 
-  const formatDayMonth = (d: Date) => d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+  const formatDayMonth = (dateStr: string) => {
+    const parts = dateStr.split("-");
+    return parts.length === 3 ? `${parts[2]}.${parts[1]}` : dateStr;
+  };
 
   const getSquadPoints = (squadId: string) => {
     let total = 0;
@@ -1266,9 +1270,9 @@ export function KioskClient({ initialData }: Props) {
                             <thead>
                               <tr style={{ background: "var(--bg-deep)", borderBottom: "2px solid #f3d6a0" }}>
                                 <th style={{ padding: "14px 16px", textAlign: "left", minWidth: 200, position: "sticky", left: 0, background: "var(--bg-deep)", zIndex: 10, borderRight: "1px solid #f3d6a0" }}>Ребенок</th>
-                                {shiftDates.map((d) => (
-                                  <th key={d.toISOString()} style={{ padding: "14px 10px", minWidth: 70, fontWeight: 700 }}>
-                                    {formatDayMonth(d)}
+                                {shiftDates.map((dateStr) => (
+                                  <th key={dateStr} style={{ padding: "14px 10px", minWidth: 70, fontWeight: 700 }}>
+                                    {formatDayMonth(dateStr)}
                                   </th>
                                 ))}
                               </tr>
@@ -1304,13 +1308,12 @@ export function KioskClient({ initialData }: Props) {
                                     )}
                                     {child.isLeft && <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 400 }}>(выбыл)</span>}
                                   </td>
-                                  {shiftDates.map((date) => {
-                                    const dateKey = date.toISOString().slice(0, 10);
+                                  {shiftDates.map((dateStr) => {
                                     const isBest = child.bestDays.some(
-                                      (b) => new Date(b.date).toISOString().slice(0, 10) === dateKey
+                                      (b) => b.date.slice(0, 10) === dateStr
                                     );
                                     return (
-                                      <td key={date.toISOString()} style={{ padding: 8 }}>
+                                      <td key={dateStr} style={{ padding: 8 }}>
                                         {isBest && data.campLogo ? (
                                           <img
                                             src={data.campLogo}
@@ -1397,15 +1400,14 @@ export function KioskClient({ initialData }: Props) {
                       ⭐ Отряды дня
                     </h3>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
-                      {shiftDates.map((date) => {
-                        const dateKey = date.toISOString().slice(0, 10);
+                      {shiftDates.map((dateStr) => {
                         const activeSods = data.squadOfDays?.filter((sod) =>
-                          new Date(sod.date).toISOString().slice(0, 10) === dateKey
+                          sod.date.slice(0, 10) === dateStr
                         ) || [];
-                        const formattedDate = date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+                        const formattedDate = formatDayMonth(dateStr);
 
                         return (
-                          <div key={dateKey} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12, minHeight: 120 }}>
+                          <div key={dateStr} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12, minHeight: 120 }}>
                             <div style={{ fontWeight: 700, color: "var(--accent)", borderBottom: "1px solid #f9ebd2", paddingBottom: 6 }}>
                               📅 {formattedDate}
                             </div>

@@ -14,6 +14,7 @@ import {
   updateSquadsOrderAction,
   toggleChildCommanderAction,
   addSquadPhotoAction,
+  addSquadPhotosAction,
   deleteSquadPhotoAction,
 } from "@/app/actions/squads";
 
@@ -105,12 +106,13 @@ export function SquadsAdmin({ shift, shifts, initialSquads, initialLogoUrl }: Pr
     const dates: string[] = [];
     const current = new Date(shift.startDate);
     const end = new Date(shift.endDate);
-    current.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
 
     while (current <= end) {
-      dates.push(current.toISOString().slice(0, 10));
-      current.setDate(current.getDate() + 1);
+      const year = current.getUTCFullYear();
+      const month = String(current.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(current.getUTCDate()).padStart(2, "0");
+      dates.push(`${year}-${month}-${day}`);
+      current.setUTCDate(current.getUTCDate() + 1);
     }
     return dates;
   };
@@ -307,34 +309,57 @@ export function SquadsAdmin({ shift, shifts, initialSquads, initialLogoUrl }: Pr
   const [uploadingGallery, setUploadingGallery] = useState(false);
 
   const handleSquadPhotoGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedSquadId) return;
+    const files = e.target.files;
+    if (!files || files.length === 0 || !selectedSquadId) return;
 
     setUploadingGallery(true);
-    const formData = new FormData();
-    formData.append("file", file);
+    const uploadedUrls: string[] = [];
+    let hasError = false;
 
     try {
-      const res = await fetch("/api/editor/upload-image", {
-        method: "POST",
-        body: formData,
+      const uploadPromises = Array.from(files).map(async (file) => {
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+
+          const res = await fetch("/api/editor/upload-image", {
+            method: "POST",
+            body: formData,
+          });
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          if (data.url) {
+            uploadedUrls.push(data.url);
+          } else {
+            hasError = true;
+          }
+        } catch {
+          hasError = true;
+        }
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      if (data.url) {
-        const actionRes = await addSquadPhotoAction(selectedSquadId, data.url);
+
+      await Promise.all(uploadPromises);
+
+      if (uploadedUrls.length > 0) {
+        const actionRes = await addSquadPhotosAction(selectedSquadId, uploadedUrls);
         if (actionRes.success) {
-          setMessage("Фото добавлено в галерею отряда!");
+          setMessage(`Успешно загружено фото: ${uploadedUrls.length}`);
           setTimeout(() => setMessage(null), 3000);
           router.refresh();
         } else {
           alert("Ошибка при сохранении фото в БД: " + actionRes.error);
         }
       }
+
+      if (hasError || uploadedUrls.length < files.length) {
+        alert(`Некоторые файлы (${files.length - uploadedUrls.length} шт.) не удалось загрузить.`);
+      }
     } catch {
-      alert("Ошибка при загрузке фото");
+      alert("Ошибка при загрузке некоторых фото");
     } finally {
       setUploadingGallery(false);
+      // Reset input value to allow uploading the same files again if needed
+      e.target.value = "";
     }
   };
 
@@ -719,6 +744,7 @@ export function SquadsAdmin({ shift, shifts, initialSquads, initialLogoUrl }: Pr
                     <input 
                       type="file" 
                       accept="image/*" 
+                      multiple
                       style={{ display: "none" }} 
                       onChange={handleSquadPhotoGalleryUpload} 
                       disabled={uploadingGallery} 

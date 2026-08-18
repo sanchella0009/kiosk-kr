@@ -15,20 +15,24 @@ export async function GET() {
 
   const rangeStart = activeShift
     ? new Date(
-        activeShift.startDate.getFullYear(),
-        activeShift.startDate.getMonth(),
-        activeShift.startDate.getDate()
+        Date.UTC(
+          activeShift.startDate.getUTCFullYear(),
+          activeShift.startDate.getUTCMonth(),
+          activeShift.startDate.getUTCDate()
+        )
       )
     : start;
   const rangeEnd = activeShift
     ? new Date(
-        activeShift.endDate.getFullYear(),
-        activeShift.endDate.getMonth(),
-        activeShift.endDate.getDate(),
-        23,
-        59,
-        59,
-        999
+        Date.UTC(
+          activeShift.endDate.getUTCFullYear(),
+          activeShift.endDate.getUTCMonth(),
+          activeShift.endDate.getUTCDate(),
+          23,
+          59,
+          59,
+          999
+        )
       )
     : end14;
 
